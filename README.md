@@ -101,6 +101,7 @@ copy .env.example .env         # macOS/Linux: cp .env.example .env
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 
 python manage.py migrate
+python manage.py loaddata initial_episodes    # ep1~10 실데이터 시드 (선택)
 python manage.py createsuperuser
 python manage.py runserver
 ```

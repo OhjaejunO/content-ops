@@ -1,0 +1,152 @@
+[
+  {
+    "model": "episodes.episode",
+    "pk": 1,
+    "fields": {
+      "number": 1,
+      "title": "그록 vs 클로드",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": null,
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 2,
+    "fields": {
+      "number": 2,
+      "title": "오르카",
+      "category": "tip",
+      "status": "published",
+      "published_at": null,
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 3,
+    "fields": {
+      "number": 3,
+      "title": "GPT 100",
+      "category": "tip",
+      "status": "published",
+      "published_at": null,
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 4,
+    "fields": {
+      "number": 4,
+      "title": "캔바 코드",
+      "category": "tip",
+      "status": "published",
+      "published_at": null,
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 5,
+    "fields": {
+      "number": 5,
+      "title": "카톡 AI",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": null,
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 6,
+    "fields": {
+      "number": 6,
+      "title": "AI 평가장 사고 2건",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": "2026-08-05T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 7,
+    "fields": {
+      "number": 7,
+      "title": "Qwen3.8-Max",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": "2026-08-06T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 8,
+    "fields": {
+      "number": 8,
+      "title": "AI 사고 상세 보고서",
+      "category": "ai_news",
+      "status": "canceled",
+      "published_at": null,
+      "cancel_reason": "동일 사건 3회 노출 회피, 키트가 승계",
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 9,
+    "fields": {
+      "number": 9,
+      "title": "[기회] OpenAI 서울 해커톤",
+      "category": "opportunity",
+      "status": "published",
+      "published_at": "2026-08-07T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 10,
+    "fields": {
+      "number": 10,
+      "title": "[기회] Higgsfield 영화제",
+      "category": "opportunity",
+      "status": "published",
+      "published_at": "2026-08-07T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-08T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.deadline",
+    "pk": 1,
+    "fields": {
+      "title": "OpenAI 서울 해커톤 접수 마감",
+      "due_date": "2026-08-26",
+      "official_url": "",
+      "episode": 9
+    }
+  },
+  {
+    "model": "episodes.deadline",
+    "pk": 2,
+    "fields": {
+      "title": "Higgsfield 영화제 마감",
+      "due_date": "2026-09-01",
+      "official_url": "",
+      "episode": 10
+    }
+  }
+]
