@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class Episode(models.Model):
@@ -111,6 +112,12 @@ class Source(models.Model):
     )
 
 
+class DeadlineQuerySet(models.QuerySet):
+    def active(self):
+        """아직 마감되지 않은 건만, 급한 순서대로."""
+        return self.filter(due_date__gte=timezone.localdate()).order_by('due_date')
+
+
 class Deadline(models.Model):
     """마감이 있는 기회(공모/지원/신청) 정보."""
 
@@ -125,3 +132,29 @@ class Deadline(models.Model):
         blank=True,
         related_name='deadlines',
     )
+
+    objects = DeadlineQuerySet.as_manager()
+
+    @property
+    def days_left(self):
+        """오늘 기준 남은 일수. 마감 당일은 0, 지났으면 음수.
+
+        기준일은 settings.TIME_ZONE(Asia/Seoul)의 '오늘'이다. UTC로 계산하면
+        한국 시간 자정~오전 9시 사이에 하루가 어긋난다.
+        """
+        return (self.due_date - timezone.localdate()).days
+
+    @property
+    def is_expired(self):
+        """마감일이 지났는지. 마감 당일은 아직 지나지 않은 것으로 본다."""
+        return self.days_left < 0
+
+    @property
+    def d_day_label(self):
+        """'D-18' / 'D-DAY' / '마감' 형식의 표시용 문자열."""
+        days_left = self.days_left
+        if days_left > 0:
+            return f'D-{days_left}'
+        if days_left == 0:
+            return 'D-DAY'
+        return '마감'

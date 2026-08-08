@@ -1,8 +1,26 @@
+import datetime
+from contextlib import contextmanager
+from unittest import mock
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Episode
+from .models import Deadline, Episode
+
+SEOUL = datetime.timezone(datetime.timedelta(hours=9))
+
+
+@contextmanager
+def frozen_now(*args):
+    """timezone.now()를 고정한다. 인자는 UTC 기준 datetime 구성요소.
+
+    localdate()는 고정된 now()를 실제 Asia/Seoul 규칙으로 변환하므로,
+    타임존 변환 자체는 가짜로 만들지 않고 그대로 검증된다.
+    """
+    fixed = datetime.datetime(*args, tzinfo=datetime.timezone.utc)
+    with mock.patch.object(timezone, 'now', return_value=fixed):
+        yield fixed
 
 
 def make_episode(number=1, **kwargs):
@@ -190,6 +208,132 @@ class CleanTests(TestCase):
         episode.status = Episode.Status.PUBLISHED
         episode.published_at = timezone.now()
         episode.full_clean()  # 예외가 나지 않아야 한다
+
+
+def make_deadline(due_date, title='테스트 마감', **kwargs):
+    return Deadline.objects.create(
+        title=title,
+        due_date=due_date,
+        official_url=kwargs.pop('official_url', 'https://example.com/'),
+        **kwargs,
+    )
+
+
+class DaysLeftTests(TestCase):
+    """오늘 날짜에 의존하지 않도록 now()를 고정하고 검증한다."""
+
+    def test_future_deadline(self):
+        deadline = make_deadline(datetime.date(2026, 8, 26))
+
+        with frozen_now(2026, 8, 8, 3, 0):  # KST 8/8 12:00
+            self.assertEqual(deadline.days_left, 18)
+            self.assertFalse(deadline.is_expired)
+            self.assertEqual(deadline.d_day_label, 'D-18')
+
+    def test_due_today(self):
+        deadline = make_deadline(datetime.date(2026, 8, 8))
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            self.assertEqual(deadline.days_left, 0)
+            self.assertFalse(deadline.is_expired)
+            self.assertEqual(deadline.d_day_label, 'D-DAY')
+
+    def test_past_deadline(self):
+        deadline = make_deadline(datetime.date(2026, 8, 1))
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            self.assertEqual(deadline.days_left, -7)
+            self.assertTrue(deadline.is_expired)
+            self.assertEqual(deadline.d_day_label, '마감')
+
+    def test_tomorrow_is_d_minus_1(self):
+        deadline = make_deadline(datetime.date(2026, 8, 9))
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            self.assertEqual(deadline.d_day_label, 'D-1')
+
+    def test_yesterday_is_expired(self):
+        deadline = make_deadline(datetime.date(2026, 8, 7))
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            self.assertEqual(deadline.days_left, -1)
+            self.assertTrue(deadline.is_expired)
+
+
+class TimezoneBoundaryTests(TestCase):
+    """UTC로 계산하면 어긋나는 구간을 짚는다."""
+
+    def test_just_before_seoul_midnight(self):
+        """KST 8/8 23:59 = UTC 8/8 14:59. 서울 기준 오늘은 8/8."""
+        deadline = make_deadline(datetime.date(2026, 8, 8))
+
+        with frozen_now(2026, 8, 8, 14, 59) as now:
+            self.assertEqual(now.astimezone(SEOUL).date(), datetime.date(2026, 8, 8))
+            self.assertEqual(deadline.days_left, 0)
+            self.assertEqual(deadline.d_day_label, 'D-DAY')
+
+    def test_just_after_seoul_midnight(self):
+        """KST 8/9 00:01 = UTC 8/8 15:01. UTC로는 아직 8/8이지만 서울은 8/9."""
+        deadline = make_deadline(datetime.date(2026, 8, 8))
+
+        with frozen_now(2026, 8, 8, 15, 1) as now:
+            self.assertEqual(now.date(), datetime.date(2026, 8, 8))
+            self.assertEqual(now.astimezone(SEOUL).date(), datetime.date(2026, 8, 9))
+            self.assertEqual(deadline.days_left, -1)
+            self.assertTrue(deadline.is_expired)
+            self.assertEqual(deadline.d_day_label, '마감')
+
+    def test_early_seoul_morning_is_already_the_new_day(self):
+        """KST 8/8 08:00 = UTC 8/7 23:00. UTC로는 어제라 하루가 어긋난다."""
+        deadline = make_deadline(datetime.date(2026, 8, 8))
+
+        with frozen_now(2026, 8, 7, 23, 0) as now:
+            self.assertEqual(now.date(), datetime.date(2026, 8, 7))
+            self.assertEqual(deadline.d_day_label, 'D-DAY')
+
+
+class ActiveQuerySetTests(TestCase):
+    def test_excludes_expired_and_sorts_by_due_date(self):
+        make_deadline(datetime.date(2026, 9, 1), title='늦은 마감')
+        make_deadline(datetime.date(2026, 8, 26), title='이른 마감')
+        make_deadline(datetime.date(2026, 8, 8), title='오늘 마감')
+        make_deadline(datetime.date(2026, 8, 7), title='지난 마감')
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            titles = list(Deadline.objects.active().values_list('title', flat=True))
+
+        self.assertEqual(titles, ['오늘 마감', '이른 마감', '늦은 마감'])
+
+    def test_due_today_is_still_active(self):
+        make_deadline(datetime.date(2026, 8, 8), title='오늘 마감')
+
+        with frozen_now(2026, 8, 8, 14, 59):
+            self.assertEqual(Deadline.objects.active().count(), 1)
+
+    def test_due_today_drops_out_after_seoul_midnight(self):
+        make_deadline(datetime.date(2026, 8, 8), title='오늘 마감')
+
+        with frozen_now(2026, 8, 8, 15, 1):
+            self.assertEqual(Deadline.objects.active().count(), 0)
+
+    def test_empty_when_everything_expired(self):
+        make_deadline(datetime.date(2026, 8, 1))
+
+        with frozen_now(2026, 8, 8, 3, 0):
+            self.assertFalse(Deadline.objects.active().exists())
+
+
+class SeedDeadlineTests(TestCase):
+    """시드된 마감 2건이 실제로 어떻게 보이는지 확인한다."""
+
+    fixtures = ['initial_episodes.json']
+
+    def test_seeded_deadlines_on_seed_date(self):
+        with frozen_now(2026, 8, 8, 3, 0):
+            labels = {d.title: d.d_day_label for d in Deadline.objects.active()}
+
+        self.assertEqual(labels['OpenAI 서울 해커톤 접수 마감'], 'D-18')
+        self.assertEqual(labels['Higgsfield 영화제 마감'], 'D-24')
 
 
 class SeedFixtureTests(TestCase):

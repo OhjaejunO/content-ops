@@ -15,4 +15,8 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(Deadline)
 class DeadlineAdmin(admin.ModelAdmin):
-    list_display = ('title', 'due_date', 'official_url', 'episode')
+    list_display = ('title', 'due_date', 'd_day_label', 'official_url', 'episode')
+
+    @admin.display(description='D-day', ordering='due_date')
+    def d_day_label(self, obj):
+        return obj.d_day_label
