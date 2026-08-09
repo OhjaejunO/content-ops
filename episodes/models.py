@@ -95,6 +95,40 @@ class Episode(models.Model):
         self.validate_status_transition()
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return f'ep{self.number} {self.title}'
+
+
+class Topic(models.Model):
+    """에피소드가 다루는 사건/주제 1건.
+
+    노출 횟수를 세는 단위가 소재(Source)가 아니라 사건인 이유는, 서로 다른
+    URL 여러 개가 같은 사건을 다루는 경우가 실제로 중복 노출 사고의 형태였기
+    때문이다. URL 단위로 세면 그 경우가 통과한다.
+    """
+
+    name = models.CharField('사건/주제', max_length=200, unique=True)
+    created_at = models.DateTimeField('생성일시', auto_now_add=True)
+    episodes = models.ManyToManyField(
+        Episode,
+        verbose_name='연결 에피소드',
+        blank=True,
+        related_name='topics',
+    )
+
+    @property
+    def exposure_count(self):
+        """이 사건이 실제로 노출된 횟수.
+
+        발행완료만 센다. 제작만 해둔 건과 발행을 접은 건은 밖으로 나가지
+        않았으므로 노출이 아니다. 중복 노출 판단의 기준은 '만들었는가'가
+        아니라 '내보냈는가'다.
+        """
+        return self.episodes.filter(status=Episode.Status.PUBLISHED).count()
+
+    def __str__(self):
+        return self.name
+
 
 class Source(models.Model):
     """에피소드의 근거가 되는 원본 자료."""
@@ -105,7 +139,10 @@ class Source(models.Model):
     episode = models.ForeignKey(
         Episode,
         verbose_name='연결 에피소드',
-        on_delete=models.SET_NULL,
+        # SET_NULL이면 에피소드를 지울 때 근거가 조용히 끊기고, 그 소재를
+        # 다뤘다는 이력이 사라진다. 노출 이력이 사라지는 경로를 막는 것이
+        # 이 모델의 목적이므로 삭제를 막는 쪽을 택한다.
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name='sources',

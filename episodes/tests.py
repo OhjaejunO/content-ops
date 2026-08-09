@@ -3,10 +3,11 @@ from contextlib import contextmanager
 from unittest import mock
 
 from django.core.exceptions import ValidationError
+from django.db.models import ProtectedError
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Deadline, Episode
+from .models import Deadline, Episode, Source, Topic
 
 SEOUL = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -334,6 +335,151 @@ class SeedDeadlineTests(TestCase):
 
         self.assertEqual(labels['OpenAI 서울 해커톤 접수 마감'], 'D-18')
         self.assertEqual(labels['Higgsfield 영화제 마감'], 'D-24')
+
+
+class ExposureCountTests(TestCase):
+    """노출 횟수는 '내보낸 것'만 센다."""
+
+    def setUp(self):
+        self.topic = Topic.objects.create(name='AI 평가장 사고')
+
+    def test_counts_published_episodes(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now()),
+            make_episode(2, status=Episode.Status.PUBLISHED, published_at=timezone.now()),
+        )
+
+        self.assertEqual(self.topic.exposure_count, 2)
+
+    def test_canceled_episode_is_not_an_exposure(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now()),
+            make_episode(2, status=Episode.Status.CANCELED, cancel_reason='접음'),
+        )
+
+        self.assertEqual(self.topic.exposure_count, 1)
+
+    def test_unpublished_episodes_are_not_exposures(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PRODUCING),
+            make_episode(2, status=Episode.Status.PRODUCED),
+            make_episode(3, status=Episode.Status.CANCELED, cancel_reason='접음'),
+        )
+
+        self.assertEqual(self.topic.exposure_count, 0)
+
+    def test_empty_topic_counts_zero(self):
+        self.assertEqual(self.topic.exposure_count, 0)
+
+    def test_cancellation_does_not_decrement_past_exposures(self):
+        """이미 발행된 건이 있으면 다른 건을 접어도 노출 이력은 남는다."""
+        published = make_episode(
+            1, status=Episode.Status.PUBLISHED, published_at=timezone.now()
+        )
+        canceled = make_episode(2, status=Episode.Status.PRODUCED)
+        self.topic.episodes.add(published, canceled)
+
+        canceled.status = Episode.Status.CANCELED
+        canceled.cancel_reason = '동일 사건 중복'
+        canceled.save()
+
+        self.assertEqual(self.topic.exposure_count, 1)
+
+
+class TopicRelationTests(TestCase):
+    def test_relation_is_bidirectional(self):
+        topic = Topic.objects.create(name='AI 평가장 사고')
+        episode = make_episode(1)
+        topic.episodes.add(episode)
+
+        self.assertIn(episode, topic.episodes.all())
+        self.assertIn(topic, episode.topics.all())
+
+    def test_episode_can_carry_several_topics(self):
+        episode = make_episode(1)
+        first = Topic.objects.create(name='AI 평가장 사고')
+        second = Topic.objects.create(name='Qwen3.8-Max 출시')
+        episode.topics.add(first, second)
+
+        self.assertEqual(episode.topics.count(), 2)
+
+    def test_topic_can_carry_several_episodes(self):
+        topic = Topic.objects.create(name='AI 평가장 사고')
+        topic.episodes.add(make_episode(1), make_episode(2))
+
+        self.assertEqual(topic.episodes.count(), 2)
+
+    def test_name_is_unique(self):
+        Topic.objects.create(name='AI 평가장 사고')
+
+        with self.assertRaises(ValidationError):
+            Topic(name='AI 평가장 사고').full_clean()
+
+
+class SourceProtectTests(TestCase):
+    """에피소드를 지워도 근거가 조용히 끊기지 않아야 한다."""
+
+    def test_deleting_an_episode_with_sources_is_blocked(self):
+        episode = make_episode(1)
+        Source.objects.create(
+            url='https://example.com/article',
+            collected_at=timezone.now(),
+            episode=episode,
+        )
+
+        with self.assertRaises(ProtectedError):
+            episode.delete()
+
+        self.assertTrue(Episode.objects.filter(pk=episode.pk).exists())
+        self.assertEqual(Source.objects.count(), 1)
+
+    def test_episode_without_sources_can_be_deleted(self):
+        episode = make_episode(1)
+
+        episode.delete()
+
+        self.assertFalse(Episode.objects.filter(pk=episode.pk).exists())
+
+
+class SeedTopicTests(TestCase):
+    """ep8 취소 사유를 데이터로 복원할 수 있는지 확인한다."""
+
+    fixtures = ['initial_episodes.json']
+
+    def test_seeded_topics_exist(self):
+        self.assertEqual(Topic.objects.count(), 2)
+
+    def test_accident_topic_counts_only_the_published_episode(self):
+        topic = Topic.objects.get(name='AI 평가장 사고')
+
+        self.assertEqual(topic.exposure_count, 1)
+        self.assertEqual(
+            set(topic.episodes.values_list('number', flat=True)), {6, 8}
+        )
+
+    def test_canceled_episode_stays_linked_to_its_topic(self):
+        """ep8이 무엇을 다루려다 접혔는지가 조회로 답해져야 한다."""
+        ep8 = Episode.objects.get(number=8)
+
+        topic = ep8.topics.get()
+
+        self.assertEqual(topic.name, 'AI 평가장 사고')
+        self.assertEqual(ep8.status, Episode.Status.CANCELED)
+
+    def test_already_published_episodes_for_ep8_topic_are_queryable(self):
+        ep8 = Episode.objects.get(number=8)
+        topic = ep8.topics.get()
+
+        already_out = topic.episodes.filter(
+            status=Episode.Status.PUBLISHED
+        ).exclude(pk=ep8.pk)
+
+        self.assertEqual(list(already_out.values_list('number', flat=True)), [6])
+
+    def test_qwen_topic_has_one_exposure(self):
+        topic = Topic.objects.get(name='Qwen3.8-Max 출시')
+
+        self.assertEqual(topic.exposure_count, 1)
 
 
 class SeedFixtureTests(TestCase):

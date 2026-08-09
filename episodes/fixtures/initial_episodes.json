@@ -148,5 +148,23 @@
       "official_url": "",
       "episode": 10
     }
+  },
+  {
+    "model": "episodes.topic",
+    "pk": 1,
+    "fields": {
+      "name": "AI 평가장 사고",
+      "created_at": "2026-08-08T00:00:00+09:00",
+      "episodes": [6, 8]
+    }
+  },
+  {
+    "model": "episodes.topic",
+    "pk": 2,
+    "fields": {
+      "name": "Qwen3.8-Max 출시",
+      "created_at": "2026-08-08T00:00:00+09:00",
+      "episodes": [7]
+    }
   }
 ]
