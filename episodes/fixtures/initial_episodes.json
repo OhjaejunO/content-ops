@@ -135,7 +135,7 @@
     "fields": {
       "title": "OpenAI 서울 해커톤 접수 마감",
       "due_date": "2026-08-26",
-      "official_url": "",
+      "official_url": "https://openaigame2026.com/#submit",
       "episode": 9
     }
   },
@@ -145,7 +145,7 @@
     "fields": {
       "title": "Higgsfield 영화제 마감",
       "due_date": "2026-09-01",
-      "official_url": "",
+      "official_url": "https://higgsfield.ai/contests/higgsfield-global-film-festival",
       "episode": 10
     }
   },
