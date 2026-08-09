@@ -99,7 +99,7 @@
       "category": "ai_news",
       "status": "canceled",
       "published_at": null,
-      "cancel_reason": "동일 사건 3회 노출 회피, 키트가 승계",
+      "cancel_reason": "동일 사건 반복 노출 회피 (ep6 발행 + 키트 승계로 이미 2채널 노출), 키트 §3이 상세 승계",
       "created_at": "2026-08-08T00:00:00+09:00"
     }
   },
