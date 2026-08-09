@@ -13,6 +13,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import similarity
+from .management.commands import _topic_common as common
 from .models import Deadline, Episode, Source, Topic
 
 SEOUL = datetime.timezone(datetime.timedelta(hours=9))
@@ -770,6 +771,207 @@ class CheckTopicWithoutTopicsTests(TestCase):
 
         self.assertIn('등록된 Topic이 없습니다', out.getvalue())
         stub.assert_not_called()
+
+
+class AdviceLabelTests(TestCase):
+    """참고 라벨은 판정이 아니다 — 문구가 결정처럼 읽히지 않아야 한다."""
+
+    def setUp(self):
+        self.topic = Topic.objects.create(name='AI 평가장 사고')
+
+    def ranked(self, top_score, second_score=None):
+        rows = [{'topic': self.topic, 'score': top_score}]
+        if second_score is not None:
+            other, _ = Topic.objects.get_or_create(name='다른 사건')
+            rows.append({'topic': other, 'score': second_score})
+        return rows
+
+    def test_no_candidates(self):
+        self.assertEqual(similarity.advice([]), '비교 대상 없음')
+
+    def test_zero_exposure_reads_as_new(self):
+        self.assertIn('신규 소재', similarity.advice(self.ranked(0.9)))
+
+    def test_weak_score_is_only_a_note(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now())
+        )
+
+        label = similarity.advice(self.ranked(0.2))
+
+        self.assertIn('유사도 낮음', label)
+        self.assertIn('노출 1회', label)
+
+    def test_clear_gap_suggests_review(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now())
+        )
+
+        label = similarity.advice(self.ranked(0.8, 0.2))
+
+        self.assertIn('중복 검토', label)
+
+    def test_close_race_defers_to_a_person(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now())
+        )
+
+        label = similarity.advice(self.ranked(0.45, 0.42))
+
+        self.assertIn('사람 확인', label)
+
+    def test_labels_never_say_it_is_decided(self):
+        self.topic.episodes.add(
+            make_episode(1, status=Episode.Status.PUBLISHED, published_at=timezone.now())
+        )
+        for rows in [self.ranked(0.9, 0.1), self.ranked(0.2), self.ranked(0.45, 0.42)]:
+            for banned in ['발행', '폐기', '확정', '자동']:
+                self.assertNotIn(banned, similarity.advice(rows))
+
+
+class RankManyTests(TestCase):
+    """여러 후보를 한 번에 — Topic 임베딩이 반복 계산되면 안 된다."""
+
+    def setUp(self):
+        self.accident = Topic.objects.create(name='AI 평가장 사고')
+        self.qwen = Topic.objects.create(name='Qwen 출시')
+
+    def test_returns_one_ranking_per_query(self):
+        with stub_embedder():
+            out = similarity.rank_many(['사고', 'qwen', '해커톤'], Topic.objects.all())
+
+        self.assertEqual(len(out), 3)
+        self.assertEqual(out[0][0]['topic'], self.accident)
+        self.assertEqual(out[1][0]['topic'], self.qwen)
+
+    def test_queries_are_embedded_in_one_call(self):
+        with stub_embedder() as stub:
+            similarity.rank_many(['가', '나', '다'], Topic.objects.all())
+
+        # 1회는 Topic 갱신, 1회는 후보 3건 묶음 — 후보마다 부르지 않는다.
+        self.assertEqual(stub.call_count, 2)
+        self.assertEqual(len(stub.call_args.args[0]), 3)
+
+    def test_cached_topics_are_not_re_embedded(self):
+        with stub_embedder():
+            similarity.rank_many(['사고'], Topic.objects.all())
+
+        with stub_embedder() as stub:
+            similarity.rank_many(['사고', 'qwen'], Topic.objects.all())
+
+        # Topic 임베딩은 캐시에서 나오므로 후보 묶음 1회만 남는다.
+        self.assertEqual(stub.call_count, 1)
+
+    def test_empty_inputs(self):
+        with stub_embedder() as stub:
+            self.assertEqual(similarity.rank_many([], Topic.objects.all()), [])
+            self.assertEqual(
+                similarity.rank_many(['가'], Topic.objects.none()), [[]])
+        stub.assert_not_called()
+
+    def test_rank_topics_delegates_to_rank_many(self):
+        with stub_embedder():
+            single = similarity.rank_topics('사고', Topic.objects.all())
+            batch = similarity.rank_many(['사고'], Topic.objects.all())[0]
+
+        self.assertEqual([r['topic'] for r in single], [r['topic'] for r in batch])
+
+
+class ScanCheckCommandTests(TestCase):
+    fixtures = ['initial_episodes.json']
+
+    CANDIDATES = [
+        'AI 평가장에서 사고가 또 났다',
+        'qwen 새 모델 출시 발표',
+        '전혀 무관한 새 소재',
+    ]
+
+    def run_scan(self, *args, **kwargs):
+        out = StringIO()
+        with stub_embedder():
+            call_command('scan_check', *args, stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_reports_every_candidate(self):
+        output = self.run_scan(*self.CANDIDATES)
+
+        self.assertIn('후보 3건', output)
+        for c in self.CANDIDATES:
+            head = c[:10]
+            self.assertIn(head, output)
+
+    def test_table_has_all_columns(self):
+        output = self.run_scan(*self.CANDIDATES)
+
+        for col in ['후보', '1위 Topic', '유사도', '노출', '참고']:
+            self.assertIn(col, output)
+
+    def test_matching_candidate_reports_its_topic(self):
+        output = self.run_scan(self.CANDIDATES[0])
+
+        self.assertIn('AI 평가장 사고', output)
+
+    def test_footer_states_it_is_advisory(self):
+        output = self.run_scan(*self.CANDIDATES)
+
+        self.assertIn('판정은 참고용', output)
+        self.assertIn('승격은 사람이 결정', output)
+
+    def test_blank_candidates_are_rejected(self):
+        with self.assertRaises(CommandError):
+            self.run_scan('   ', '')
+
+    def test_command_changes_nothing(self):
+        before = {
+            t.name: set(t.episodes.values_list('number', flat=True))
+            for t in Topic.objects.all()
+        }
+
+        self.run_scan(*self.CANDIDATES)
+
+        after = {
+            t.name: set(t.episodes.values_list('number', flat=True))
+            for t in Topic.objects.all()
+        }
+        self.assertEqual(before, after)
+
+    def test_topic_embeddings_are_reused_across_candidates(self):
+        with stub_embedder():
+            call_command('scan_check', *self.CANDIDATES, stdout=StringIO())
+
+        with stub_embedder() as stub:
+            call_command('scan_check', *self.CANDIDATES, stdout=StringIO())
+
+        self.assertEqual(stub.call_count, 1)
+
+
+class ScanCheckWithoutTopicsTests(TestCase):
+    def test_reports_nothing_to_compare(self):
+        out = StringIO()
+
+        with stub_embedder() as stub:
+            call_command('scan_check', '아무 소재', stdout=out)
+
+        self.assertIn('등록된 Topic이 없습니다', out.getvalue())
+        stub.assert_not_called()
+
+
+class ColumnFitTests(TestCase):
+    """한글이 섞인 표가 어긋나지 않아야 한다."""
+
+    def test_korean_counts_as_two_cells(self):
+        self.assertEqual(common.width('가나'), 4)
+        self.assertEqual(common.width('ab'), 2)
+
+    def test_fit_pads_to_exact_width(self):
+        for text in ['가나다', 'abc', '가a나b', '']:
+            self.assertEqual(common.width(common.fit(text, 20)), 20)
+
+    def test_long_text_is_truncated_with_ellipsis(self):
+        out = common.fit('가' * 40, 20)
+
+        self.assertIn('…', out)
+        self.assertEqual(common.width(out), 20)
 
 
 class MissingDependencyTests(TestCase):

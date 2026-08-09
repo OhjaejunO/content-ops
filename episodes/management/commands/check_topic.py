@@ -7,8 +7,8 @@
 
 from django.core.management.base import BaseCommand, CommandError
 
-from ... import similarity
-from ...models import Episode, Topic
+from ...models import Episode
+from . import _topic_common as common
 
 
 class Command(BaseCommand):
@@ -34,17 +34,13 @@ class Command(BaseCommand):
         if top_n < 1:
             raise CommandError('--top은 1 이상이어야 합니다.')
 
-        topics = Topic.objects.prefetch_related('episodes')
-        if not topics.exists():
-            self.stdout.write('등록된 Topic이 없습니다. 비교할 대상이 없습니다.')
+        topics = common.load_topics(self.stdout)
+        if topics is None:
             return
 
-        try:
-            ranked = similarity.rank_topics(
-                text, topics, top_n=top_n, refresh=options['refresh']
-            )
-        except similarity.EmbeddingUnavailable as exc:
-            raise CommandError(str(exc)) from exc
+        ranked = common.rank(
+            [text], topics, top_n=top_n, refresh=options['refresh']
+        )[0]
 
         self.stdout.write(f'입력: {text}')
         self.stdout.write('')
@@ -67,4 +63,4 @@ class Command(BaseCommand):
                 )
             self.stdout.write('')
 
-        self.stdout.write('판정은 참고용입니다. 승격은 사람이 결정합니다.')
+        self.stdout.write(common.ADVISORY)

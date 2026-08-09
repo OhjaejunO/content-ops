@@ -111,21 +111,56 @@ def refresh_topic_embeddings(topics, refresh=False):
     return [topic for topic, _, _ in stale]
 
 
-def rank_topics(query, topics, top_n=3, refresh=False):
-    """query와 가장 가까운 Topic을 점수 내림차순으로 top_n개."""
+def rank_many(queries, topics, top_n=3, refresh=False):
+    """여러 후보를 한 번에 비교한다. 반환은 후보별 순위 리스트.
+
+    Topic 임베딩은 **한 번만** 갱신하고, 후보 임베딩도 **한 번의 호출로 묶는다.**
+    후보마다 따로 돌리면 같은 Topic을 반복해서 인코딩하게 된다.
+    """
+    queries = list(queries)
     topics = list(topics)
-    if not topics:
-        return []
+    if not topics or not queries:
+        return [[] for _ in queries]
 
     refresh_topic_embeddings(topics, refresh=refresh)
-    query_vector = embed_texts([query])[0]
+    decoded = [(t, decode_vector(t.embedding)) for t in topics]
 
-    scored = [
-        {
-            'topic': topic,
-            'score': cosine_similarity(query_vector, decode_vector(topic.embedding)),
-        }
-        for topic in topics
-    ]
-    scored.sort(key=lambda row: row['score'], reverse=True)
-    return scored[:top_n]
+    results = []
+    for query_vector in embed_texts(queries):
+        scored = [
+            {'topic': topic, 'score': cosine_similarity(query_vector, vector)}
+            for topic, vector in decoded
+        ]
+        scored.sort(key=lambda row: row['score'], reverse=True)
+        results.append(scored[:top_n])
+    return results
+
+
+def rank_topics(query, topics, top_n=3, refresh=False):
+    """query와 가장 가까운 Topic을 점수 내림차순으로 top_n개."""
+    return rank_many([query], topics, top_n=top_n, refresh=refresh)[0]
+
+
+# 참고 라벨 기준값. **판정이 아니라 읽는 힌트다.**
+# 유사도 절대값만으로 자르지 않고 1위와 2위의 간격을 같이 본다 —
+# 점수 하나만 보면 임계값으로 자르고 싶어지는데 이 판정은 그런 성격이 아니다.
+WEAK_SCORE = 0.35
+CLEAR_GAP = 0.10
+
+
+def advice(ranked):
+    """상위 후보에 붙일 참고 라벨. **결정하지 않는다.**"""
+    if not ranked:
+        return '비교 대상 없음'
+
+    top = ranked[0]
+    exposure = top['topic'].exposure_count
+    gap = top['score'] - (ranked[1]['score'] if len(ranked) > 1 else 0.0)
+
+    if exposure == 0:
+        return '노출 0회 — 신규 소재'
+    if top['score'] < WEAK_SCORE:
+        return f'노출 {exposure}회 · 유사도 낮음 — 참고'
+    if gap >= CLEAR_GAP:
+        return f'노출 {exposure}회 · 1위 뚜렷 — 중복 검토'
+    return f'노출 {exposure}회 · 1·2위 접전 — 사람 확인'
