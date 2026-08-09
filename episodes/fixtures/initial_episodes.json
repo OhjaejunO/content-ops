@@ -150,6 +150,76 @@
     }
   },
   {
+    "model": "episodes.source",
+    "pk": 1,
+    "fields": {
+      "url": "https://www.anthropic.com/news/investigating-incidents-cybersecurity-evals",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "Anthropic — 사이버보안 평가 사고 조사 공지",
+      "episode": 6
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 2,
+    "fields": {
+      "url": "https://www.aisi.gov.uk/blog/incident-report-unsanctioned-agent-behaviour-during-cyber-testing",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "AISI — 사이버 테스트 중 비승인 에이전트 행동 사고 리포트",
+      "episode": 6
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 3,
+    "fields": {
+      "url": "https://openai.com/index/third-party-cyber-evaluations-involving-openai-models/",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "OpenAI — 자사 모델이 포함된 3자 사이버 평가 관련 공개",
+      "episode": 6
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 4,
+    "fields": {
+      "url": "https://qwen.ai/blog?id=qwen3.8",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "Qwen 공식 블로그 — Qwen3.8 출시 발표. 2.4T 파라미터, API 가격, 오픈웨이트 공개 예고",
+      "episode": 7
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 5,
+    "fields": {
+      "url": "https://cdn.prod.website-files.com/663bd486c5e4c81588db7a1d/6a724858f7db25c81487016d_Security%20Incident%20INC-2026-07-28-01.pdf",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "AISI 사고 보고서 INC-2026-07-28-01 전문 (35쪽). ep8이 다루려던 원본, 발행은 접고 키트 §3이 승계",
+      "episode": 8
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 6,
+    "fields": {
+      "url": "https://openaigame2026.com/#submit",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "OpenAI 서울 해커톤 공식 접수 페이지",
+      "episode": 9
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 7,
+    "fields": {
+      "url": "https://higgsfield.ai/contests/higgsfield-global-film-festival",
+      "collected_at": "2026-08-08T00:00:00+09:00",
+      "summary": "Higgsfield Global Film Festival 공식 페이지",
+      "episode": 10
+    }
+  },
+  {
     "model": "episodes.topic",
     "pk": 1,
     "fields": {
