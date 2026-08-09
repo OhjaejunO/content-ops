@@ -1,0 +1,12 @@
+# 중복 감지(check_topic)에만 필요한 선택 의존성입니다.
+#
+#   pip install -r requirements-ml.txt
+#
+# requirements.txt에 넣지 않은 이유는 torch가 무겁고, 이 앱의 나머지 기능이
+# 전부 이것 없이 동작하기 때문입니다. 설치하지 않으면 check_topic만 안내를
+# 띄우고 멈추며, 나머지는 그대로 돌아갑니다.
+#
+# GPU가 있으면 자동으로 쓰고, 없으면 CPU로 폴백합니다.
+
+sentence-transformers>=3.0
+torch>=2.0

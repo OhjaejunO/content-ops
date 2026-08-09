@@ -109,6 +109,12 @@ class Topic(models.Model):
 
     name = models.CharField('사건/주제', max_length=200, unique=True)
     created_at = models.DateTimeField('생성일시', auto_now_add=True)
+    # 중복 감지용 임베딩 캐시. Topic 수십 개 규모라 벡터DB를 둘 이유가 없고,
+    # 매번 다시 인코딩하는 것이 유일한 비용이므로 그것만 없앤다.
+    embedding = models.BinaryField('임베딩 캐시', null=True, blank=True, editable=False)
+    embedding_key = models.CharField(
+        '임베딩 캐시 키', max_length=64, blank=True, default='', editable=False
+    )
     episodes = models.ManyToManyField(
         Episode,
         verbose_name='연결 에피소드',

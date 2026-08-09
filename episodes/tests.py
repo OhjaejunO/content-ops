@@ -1,12 +1,16 @@
 import datetime
 from contextlib import contextmanager
+from io import StringIO
 from unittest import mock
 
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db.models import ProtectedError
 from django.test import TestCase
 from django.utils import timezone
 
+from . import similarity
 from .models import Deadline, Episode, Source, Topic
 
 SEOUL = datetime.timezone(datetime.timedelta(hours=9))
@@ -498,3 +502,322 @@ class SeedFixtureTests(TestCase):
     def test_unconfirmed_publish_dates_stay_null(self):
         unconfirmed = Episode.objects.filter(number__in=[1, 2, 3, 4, 5])
         self.assertEqual(unconfirmed.filter(published_at__isnull=True).count(), 5)
+
+
+# --- 중복 감지 -------------------------------------------------------------
+
+#: 가짜 임베딩의 축. 각 단어가 텍스트에 있으면 1, 없으면 0인 벡터를 만든다.
+#: 실제 모델을 부르지 않으므로 다른 환경에서도 다운로드 없이 돌아간다.
+FAKE_AXES = ['평가장', '사고', 'qwen', '출시', '해커톤']
+
+
+def fake_embed_texts(texts):
+    return [
+        [1.0 if axis in text.lower() else 0.0 for axis in FAKE_AXES] for text in texts
+    ]
+
+
+@contextmanager
+def stub_embedder(side_effect=None):
+    """임베딩 함수를 가짜로 바꾼다. 호출 횟수를 세기 위해 Mock으로 감싼다."""
+    with mock.patch.object(
+        similarity, 'embed_texts', side_effect=side_effect or fake_embed_texts
+    ) as stub:
+        yield stub
+
+
+class VectorCodecTests(TestCase):
+    def test_roundtrip(self):
+        original = [0.5, -0.25, 0.125, 0.0]
+
+        restored = similarity.decode_vector(similarity.encode_vector(original))
+
+        self.assertEqual(len(restored), len(original))
+        for got, want in zip(restored, original):
+            self.assertAlmostEqual(got, want, places=6)
+
+    def test_encoded_value_is_bytes(self):
+        self.assertIsInstance(similarity.encode_vector([1.0, 2.0]), bytes)
+
+
+class CosineSimilarityTests(TestCase):
+    def test_identical_vectors(self):
+        self.assertAlmostEqual(similarity.cosine_similarity([1, 2, 3], [1, 2, 3]), 1.0)
+
+    def test_orthogonal_vectors(self):
+        self.assertAlmostEqual(similarity.cosine_similarity([1, 0], [0, 1]), 0.0)
+
+    def test_opposite_vectors(self):
+        self.assertAlmostEqual(similarity.cosine_similarity([1, 0], [-1, 0]), -1.0)
+
+    def test_scale_does_not_matter(self):
+        self.assertAlmostEqual(similarity.cosine_similarity([1, 1], [5, 5]), 1.0)
+
+    def test_zero_vector_scores_zero(self):
+        self.assertEqual(similarity.cosine_similarity([0, 0], [1, 1]), 0.0)
+
+    def test_length_mismatch_scores_zero(self):
+        self.assertEqual(similarity.cosine_similarity([1, 0, 0], [1, 0]), 0.0)
+
+
+class TopicTextTests(TestCase):
+    def test_includes_name_and_episode_titles(self):
+        topic = Topic.objects.create(name='AI 평가장 사고')
+        topic.episodes.add(make_episode(6, title='AI 평가장 사고 2건'))
+
+        text = similarity.topic_text(topic)
+
+        self.assertIn('AI 평가장 사고', text)
+        self.assertIn('AI 평가장 사고 2건', text)
+
+    def test_name_only_when_no_episodes(self):
+        topic = Topic.objects.create(name='AI 평가장 사고')
+
+        self.assertEqual(similarity.topic_text(topic), 'AI 평가장 사고')
+
+    def test_cache_key_changes_when_episodes_change(self):
+        topic = Topic.objects.create(name='AI 평가장 사고')
+        before = similarity.cache_key(similarity.topic_text(topic))
+
+        topic.episodes.add(make_episode(6, title='AI 평가장 사고 2건'))
+        after = similarity.cache_key(similarity.topic_text(topic))
+
+        self.assertNotEqual(before, after)
+
+
+class EmbeddingCacheTests(TestCase):
+    def setUp(self):
+        self.topic = Topic.objects.create(name='AI 평가장 사고')
+
+    def test_embedding_is_stored_on_first_pass(self):
+        with stub_embedder() as stub:
+            similarity.refresh_topic_embeddings([self.topic])
+
+        self.topic.refresh_from_db()
+        self.assertTrue(self.topic.embedding)
+        self.assertTrue(self.topic.embedding_key)
+        self.assertEqual(stub.call_count, 1)
+
+    def test_second_pass_uses_the_cache(self):
+        with stub_embedder():
+            similarity.refresh_topic_embeddings([self.topic])
+
+        self.topic.refresh_from_db()
+        with stub_embedder() as stub:
+            similarity.refresh_topic_embeddings([self.topic])
+
+        stub.assert_not_called()
+
+    def test_changed_text_invalidates_the_cache(self):
+        with stub_embedder():
+            similarity.refresh_topic_embeddings([self.topic])
+
+        self.topic.refresh_from_db()
+        self.topic.episodes.add(make_episode(6, title='AI 평가장 사고 2건'))
+        with stub_embedder() as stub:
+            similarity.refresh_topic_embeddings([self.topic])
+
+        self.assertEqual(stub.call_count, 1)
+
+    def test_refresh_flag_forces_recompute(self):
+        with stub_embedder():
+            similarity.refresh_topic_embeddings([self.topic])
+
+        self.topic.refresh_from_db()
+        with stub_embedder() as stub:
+            similarity.refresh_topic_embeddings([self.topic], refresh=True)
+
+        self.assertEqual(stub.call_count, 1)
+
+    def test_stale_topics_are_embedded_in_one_batch(self):
+        second = Topic.objects.create(name='Qwen3.8-Max 출시')
+
+        with stub_embedder() as stub:
+            similarity.refresh_topic_embeddings([self.topic, second])
+
+        self.assertEqual(stub.call_count, 1)
+        self.assertEqual(len(stub.call_args.args[0]), 2)
+
+
+class RankTopicsTests(TestCase):
+    def setUp(self):
+        self.accident = Topic.objects.create(name='AI 평가장 사고')
+        self.qwen = Topic.objects.create(name='Qwen 출시')
+        self.hackathon = Topic.objects.create(name='해커톤')
+
+    def test_closest_topic_ranks_first(self):
+        with stub_embedder():
+            ranked = similarity.rank_topics('평가장 사고 후속', Topic.objects.all())
+
+        self.assertEqual(ranked[0]['topic'], self.accident)
+        self.assertAlmostEqual(ranked[0]['score'], 1.0)
+
+    def test_scores_are_sorted_descending(self):
+        with stub_embedder():
+            ranked = similarity.rank_topics('qwen 출시', Topic.objects.all())
+
+        scores = [row['score'] for row in ranked]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+    def test_top_n_limits_the_result(self):
+        with stub_embedder():
+            ranked = similarity.rank_topics('사고', Topic.objects.all(), top_n=2)
+
+        self.assertEqual(len(ranked), 2)
+
+    def test_unrelated_query_scores_zero(self):
+        with stub_embedder():
+            ranked = similarity.rank_topics('전혀 무관한 문장', Topic.objects.all())
+
+        self.assertEqual(ranked[0]['score'], 0.0)
+
+    def test_no_topics_returns_empty(self):
+        with stub_embedder() as stub:
+            ranked = similarity.rank_topics('사고', Topic.objects.none())
+
+        self.assertEqual(ranked, [])
+        stub.assert_not_called()
+
+
+class CheckTopicCommandTests(TestCase):
+    fixtures = ['initial_episodes.json']
+
+    def run_command(self, *args, **kwargs):
+        out = StringIO()
+        with stub_embedder():
+            call_command('check_topic', *args, stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_reports_candidates_with_score_and_exposure(self):
+        output = self.run_command('AI 평가장에서 사고가 또 났다')
+
+        self.assertIn('AI 평가장 사고', output)
+        self.assertIn('유사도', output)
+        self.assertIn('노출 1회', output)
+
+    def test_lists_linked_episodes_including_canceled(self):
+        output = self.run_command('AI 평가장에서 사고가 또 났다')
+
+        self.assertIn('ep6', output)
+        self.assertIn('ep8', output)
+        self.assertIn('발행취소', output)
+
+    def test_footer_states_the_judgement_is_advisory(self):
+        output = self.run_command('AI 평가장 사고')
+
+        self.assertIn('판정은 참고용', output)
+        self.assertIn('승격은 사람이 결정', output)
+
+    def test_top_option_limits_output(self):
+        output = self.run_command('사고', '--top', '1')
+
+        self.assertEqual(output.count('유사도'), 1)
+
+    def test_defaults_to_three_candidates(self):
+        Topic.objects.create(name='세 번째 사건')
+        Topic.objects.create(name='네 번째 사건')
+
+        output = self.run_command('사고')
+
+        self.assertEqual(output.count('유사도'), 3)
+
+    def test_blank_text_is_rejected(self):
+        with self.assertRaises(CommandError):
+            self.run_command('   ')
+
+    def test_non_positive_top_is_rejected(self):
+        with self.assertRaises(CommandError):
+            self.run_command('사고', '--top', '0')
+
+    def test_command_does_not_change_topic_links(self):
+        """판정은 아무것도 승격하지 않는다."""
+        before = {
+            topic.name: set(topic.episodes.values_list('number', flat=True))
+            for topic in Topic.objects.all()
+        }
+
+        self.run_command('AI 평가장 사고')
+
+        after = {
+            topic.name: set(topic.episodes.values_list('number', flat=True))
+            for topic in Topic.objects.all()
+        }
+        self.assertEqual(before, after)
+
+
+class CheckTopicWithoutTopicsTests(TestCase):
+    def test_reports_nothing_to_compare(self):
+        out = StringIO()
+
+        with stub_embedder() as stub:
+            call_command('check_topic', '아무 소재', stdout=out)
+
+        self.assertIn('등록된 Topic이 없습니다', out.getvalue())
+        stub.assert_not_called()
+
+
+class MissingDependencyTests(TestCase):
+    fixtures = ['initial_episodes.json']
+
+    def test_command_explains_how_to_install(self):
+        out = StringIO()
+        failure = similarity.EmbeddingUnavailable(
+            '임베딩 의존성이 설치되지 않았습니다.\n  pip install -r requirements-ml.txt'
+        )
+
+        with stub_embedder(side_effect=failure):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('check_topic', '사고', stdout=out)
+
+        self.assertIn('requirements-ml.txt', str(ctx.exception))
+
+    def test_load_model_raises_when_dependency_missing(self):
+        with mock.patch.object(similarity, '_model', None):
+            with mock.patch.dict('sys.modules', {'sentence_transformers': None}):
+                with self.assertRaises(similarity.EmbeddingUnavailable):
+                    similarity.load_model()
+
+
+class EmbedTextsGlueTests(TestCase):
+    """모델을 내려받지 않고, 모델을 부르는 부분만 검증한다."""
+
+    def test_passes_texts_and_normalizes(self):
+        model = mock.Mock()
+        model.encode.return_value = [[1, 0], [0, 1]]
+
+        with mock.patch.object(similarity, 'load_model', return_value=model):
+            vectors = similarity.embed_texts(['가', '나'])
+
+        model.encode.assert_called_once_with(['가', '나'], normalize_embeddings=True)
+        self.assertEqual(vectors, [[1.0, 0.0], [0.0, 1.0]])
+
+    def test_values_are_plain_floats(self):
+        """모델은 numpy 스칼라를 돌려준다. BinaryField로 넘기기 전에 float이어야 한다."""
+        model = mock.Mock()
+        model.encode.return_value = [[1, 2]]
+
+        with mock.patch.object(similarity, 'load_model', return_value=model):
+            vectors = similarity.embed_texts(['가'])
+
+        for value in vectors[0]:
+            self.assertIsInstance(value, float)
+
+
+class ResolveDeviceTests(TestCase):
+    def test_falls_back_to_cpu_without_torch(self):
+        with mock.patch.dict('sys.modules', {'torch': None}):
+            self.assertEqual(similarity.resolve_device(), 'cpu')
+
+    def test_uses_cuda_when_available(self):
+        torch = mock.Mock()
+        torch.cuda.is_available.return_value = True
+
+        with mock.patch.dict('sys.modules', {'torch': torch}):
+            self.assertEqual(similarity.resolve_device(), 'cuda')
+
+    def test_uses_cpu_when_no_gpu_present(self):
+        torch = mock.Mock()
+        torch.cuda.is_available.return_value = False
+
+        with mock.patch.dict('sys.modules', {'torch': torch}):
+            self.assertEqual(similarity.resolve_device(), 'cpu')
