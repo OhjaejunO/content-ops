@@ -136,6 +136,13 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
+# 아침 스캔 로그 폴더 (`YYYY-MM-DD.md`).
+# **다른 저장소에 있다.** 스캔 로그는 콘텐츠 제작 쪽(tomangchi-lab.github.io/workshop)에
+# 쌓이고 이 앱은 읽기만 하므로, 경로를 코드에 박지 않고 환경변수로 받는다.
+# 비워 두면 `scan_check --from-log` 만 안내를 띄우고 멈춘다.
+SCAN_LOG_DIR = os.environ.get('SCAN_LOG_DIR', '')
+
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 

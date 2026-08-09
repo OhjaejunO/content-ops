@@ -1,6 +1,7 @@
 import datetime
 import json
 import pathlib
+import tempfile
 from contextlib import contextmanager
 from io import StringIO
 from unittest import mock
@@ -13,6 +14,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import similarity
+from .management.commands import _scan_log
 from .management.commands import _topic_common as common
 from .models import Deadline, Episode, Source, Topic
 
@@ -943,6 +945,146 @@ class ScanCheckCommandTests(TestCase):
             call_command('scan_check', *self.CANDIDATES, stdout=StringIO())
 
         self.assertEqual(stub.call_count, 1)
+
+
+SCAN_LOG_SAMPLE = """# 아침 스캔 로그 — 2026-08-09
+
+앞부분 설명. 여기 있는 `- 목록`은 후보가 아니다.
+
+## 후보
+
+- Meta AI 모델이 사이버보안 테스트 중 타사 시스템 해킹
+- **Qwen** 차기 모델 출시 임박
+- [엔비디아 신형 칩 공급 계약](https://example.com/nvidia)
+
+## 판정
+
+- 이 아래 목록은 후보가 아니므로 읽지 않는다
+"""
+
+
+class ScanLogParserTests(TestCase):
+    """형식이 아직 한 건뿐이라 느슨하게 읽는다 — 대신 실패는 시끄럽게."""
+
+    def test_reads_only_the_candidate_section(self):
+        items = _scan_log.parse_candidates(SCAN_LOG_SAMPLE)
+
+        self.assertEqual(len(items), 3)
+        self.assertNotIn('이 아래 목록은 후보가 아니므로 읽지 않는다', items)
+
+    def test_strips_markdown_emphasis_and_links(self):
+        items = _scan_log.parse_candidates(SCAN_LOG_SAMPLE)
+
+        self.assertEqual(items[1], 'Qwen 차기 모델 출시 임박')
+        self.assertEqual(items[2], '엔비디아 신형 칩 공급 계약')
+
+    def test_accepts_numbered_items(self):
+        items = _scan_log.parse_candidates('## 후보\n1. 첫째\n2) 둘째\n')
+
+        self.assertEqual(items, ['첫째', '둘째'])
+
+    def test_heading_only_needs_to_contain_the_word(self):
+        items = _scan_log.parse_candidates('### 오늘 후보 목록\n- 하나\n')
+
+        self.assertEqual(items, ['하나'])
+
+    def test_missing_section_explains_the_expected_shape(self):
+        with self.assertRaises(_scan_log.ScanLogError) as ctx:
+            _scan_log.parse_candidates('# 로그\n\n## 판정 요약\n\n| a | b |\n')
+
+        message = str(ctx.exception)
+        self.assertIn('후보', message)
+        self.assertIn('## 후보', message)
+        self.assertIn('인자로 직접', message)
+
+    def test_empty_section_is_reported(self):
+        with self.assertRaises(_scan_log.ScanLogError) as ctx:
+            _scan_log.parse_candidates('## 후보\n\n표만 있음\n\n| a |\n')
+
+        self.assertIn('목록 항목이 없습니다', str(ctx.exception))
+
+    def test_tables_are_not_read(self):
+        with self.assertRaises(_scan_log.ScanLogError):
+            _scan_log.parse_candidates('## 후보\n| 후보 | 판정 |\n|---|---|\n| 가 | 나 |\n')
+
+
+class ScanLogPathTests(TestCase):
+    def test_unset_directory_explains_how_to_set_it(self):
+        with self.assertRaises(_scan_log.ScanLogError) as ctx:
+            _scan_log.log_path('', '2026-08-09')
+
+        self.assertIn('SCAN_LOG_DIR', str(ctx.exception))
+
+    def test_missing_file_reports_the_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(_scan_log.ScanLogError) as ctx:
+                _scan_log.log_path(tmp, '2026-01-01')
+
+        self.assertIn('2026-01-01.md', str(ctx.exception))
+        self.assertIn('--from-log', str(ctx.exception))
+
+    def test_reads_an_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / '2026-08-09.md'
+            path.write_text(SCAN_LOG_SAMPLE, encoding='utf-8')
+
+            items, used = _scan_log.read_candidates(tmp, '2026-08-09')
+
+        self.assertEqual(len(items), 3)
+        self.assertEqual(used, str(path))
+
+
+class ScanCheckFromLogTests(TestCase):
+    fixtures = ['initial_episodes.json']
+
+    def run_from_log(self, body, date='2026-08-09'):
+        out = StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            (pathlib.Path(tmp) / f'{date}.md').write_text(body, encoding='utf-8')
+            with self.settings(SCAN_LOG_DIR=tmp):
+                with stub_embedder():
+                    call_command('scan_check', '--from-log', date, stdout=out)
+        return out.getvalue()
+
+    def test_candidates_come_from_the_log(self):
+        output = self.run_from_log(SCAN_LOG_SAMPLE)
+
+        self.assertIn('후보 3건', output)
+        self.assertIn('Meta AI', output)
+
+    def test_output_names_the_source_file(self):
+        output = self.run_from_log(SCAN_LOG_SAMPLE)
+
+        self.assertIn('출처:', output)
+        self.assertIn('2026-08-09.md', output)
+
+    def test_footer_is_still_advisory(self):
+        output = self.run_from_log(SCAN_LOG_SAMPLE)
+
+        self.assertIn('판정은 참고용', output)
+
+    def test_missing_section_becomes_a_command_error(self):
+        with self.assertRaises(CommandError) as ctx:
+            self.run_from_log('# 로그\n\n## 판정 요약\n\n표만 있음\n')
+
+        self.assertIn('## 후보', str(ctx.exception))
+
+    def test_missing_file_becomes_a_command_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.settings(SCAN_LOG_DIR=tmp):
+                with self.assertRaises(CommandError) as ctx:
+                    call_command('scan_check', '--from-log', '2026-01-01',
+                                 stdout=StringIO())
+
+        self.assertIn('2026-01-01.md', str(ctx.exception))
+
+    def test_unset_directory_becomes_a_command_error(self):
+        with self.settings(SCAN_LOG_DIR=''):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('scan_check', '--from-log', '2026-08-09',
+                             stdout=StringIO())
+
+        self.assertIn('SCAN_LOG_DIR', str(ctx.exception))
 
 
 class ScanCheckWithoutTopicsTests(TestCase):

@@ -11,9 +11,12 @@
 """
 import sys
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from ... import similarity
+from . import _scan_log
 from . import _topic_common as common
 
 COL_CAND = 34
@@ -29,14 +32,30 @@ class Command(BaseCommand):
             help='소재 후보. 생략하면 stdin에서 한 줄에 하나씩 읽습니다',
         )
         parser.add_argument(
+            '--from-log', nargs='?', const='today', metavar='YYYY-MM-DD',
+            help='아침 스캔 로그에서 후보를 읽습니다 (날짜 생략 시 오늘)',
+        )
+        parser.add_argument(
             '--refresh', action='store_true',
             help='캐시된 임베딩을 무시하고 다시 계산합니다',
         )
 
     def handle(self, *args, **options):
         candidates = [c.strip() for c in options['candidates'] if c.strip()]
-        if not candidates and not sys.stdin.isatty():
+        source = None
+
+        if options['from_log']:
+            date_str = options['from_log']
+            if date_str == 'today':
+                date_str = timezone.localdate().isoformat()
+            try:
+                candidates, source = _scan_log.read_candidates(
+                    getattr(settings, 'SCAN_LOG_DIR', ''), date_str)
+            except _scan_log.ScanLogError as exc:
+                raise CommandError(str(exc)) from exc
+        elif not candidates and not sys.stdin.isatty():
             candidates = [ln.strip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+
         if not candidates:
             raise CommandError(
                 '후보가 비어 있습니다. 인자로 넘기거나 stdin으로 한 줄에 하나씩 주세요.')
@@ -48,7 +67,8 @@ class Command(BaseCommand):
         results = common.rank(candidates, topics, top_n=3,
                               refresh=options['refresh'])
 
-        self.stdout.write(f'후보 {len(candidates)}건')
+        self.stdout.write(f'후보 {len(candidates)}건'
+                          + (f'  (출처: {source})' if source else ''))
         self.stdout.write('')
         self.stdout.write(
             common.fit('후보', COL_CAND) + common.fit('1위 Topic', COL_TOPIC)
