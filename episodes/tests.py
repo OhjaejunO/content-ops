@@ -62,7 +62,7 @@ class ForwardTransitionTests(TestCase):
         episode = make_episode(status=Episode.Status.PRODUCED)
 
         episode.status = Episode.Status.CANCELED
-        episode.cancel_reason = '동일 사건 3회 노출 회피'
+        episode.cancel_reason = '테스트용 취소 사유'
         episode.save()
 
         episode.refresh_from_db()
