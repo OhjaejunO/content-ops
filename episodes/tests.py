@@ -357,7 +357,7 @@ class SeedDeadlineTests(TestCase):
             labels = {d.title: d.d_day_label for d in Deadline.objects.active()}
 
         self.assertEqual(labels['OpenAI 서울 해커톤 접수 마감'], 'D-18')
-        self.assertEqual(labels['Higgsfield 영화제 마감'], 'D-24')
+        self.assertEqual(labels['Higgsfield 영화제 접수 마감'], 'D-26')
 
 
 class ExposureCountTests(TestCase):

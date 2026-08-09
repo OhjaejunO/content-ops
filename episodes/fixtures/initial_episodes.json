@@ -156,8 +156,8 @@
     "model": "episodes.deadline",
     "pk": 2,
     "fields": {
-      "title": "Higgsfield 영화제 마감",
-      "due_date": "2026-09-01",
+      "title": "Higgsfield 영화제 접수 마감",
+      "due_date": "2026-09-03",
       "official_url": "https://higgsfield.ai/contests/higgsfield-global-film-festival",
       "episode": 10
     }
