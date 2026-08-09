@@ -130,6 +130,19 @@
     }
   },
   {
+    "model": "episodes.episode",
+    "pk": 11,
+    "fields": {
+      "number": 11,
+      "title": "클로드 스킬 큐레이션",
+      "category": "tip",
+      "status": "published",
+      "published_at": "2026-08-10T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-09T00:00:00+09:00"
+    }
+  },
+  {
     "model": "episodes.deadline",
     "pk": 1,
     "fields": {
@@ -217,6 +230,55 @@
       "collected_at": "2026-08-08T00:00:00+09:00",
       "summary": "Higgsfield Global Film Festival 공식 페이지",
       "episode": 10
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 8,
+    "fields": {
+      "url": "https://github.com/anthropics/skills",
+      "collected_at": "2026-08-09T00:00:00+09:00",
+      "summary": "Anthropic 공식 스킬 저장소. 문서 스킬(docx·xlsx·pptx·pdf)과 예시 스킬 17종. 실측 167,146★",
+      "episode": 11
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 9,
+    "fields": {
+      "url": "https://github.com/coleam00/excalidraw-diagram-skill",
+      "collected_at": "2026-08-09T00:00:00+09:00",
+      "summary": "Excalidraw 다이어그램 생성 스킬. README상 Claude Code 등 코딩 에이전트 대상. 실측 4,352★",
+      "episode": 11
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 10,
+    "fields": {
+      "url": "https://github.com/Master-cai/Research-Paper-Writing-Skills",
+      "collected_at": "2026-08-09T00:00:00+09:00",
+      "summary": "논문 작성 스킬 패키지. 설치 안내는 Codex·Claude Code·Gemini. 웹 업로드 동작은 미보증. 실측 5,902★",
+      "episode": 11
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 11,
+    "fields": {
+      "url": "https://claude.com/blog/skills",
+      "collected_at": "2026-08-09T00:00:00+09:00",
+      "summary": "Anthropic 공식 블로그 'Introducing Agent Skills'(2025-10-16). ep11 01번 카드의 Capabilities 토글 이미지 출처",
+      "episode": 11
+    }
+  },
+  {
+    "model": "episodes.topic",
+    "pk": 3,
+    "fields": {
+      "name": "클로드 스킬",
+      "created_at": "2026-08-09T00:00:00+09:00",
+      "episodes": [11]
     }
   },
   {

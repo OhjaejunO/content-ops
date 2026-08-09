@@ -1,4 +1,6 @@
 import datetime
+import json
+import pathlib
 from contextlib import contextmanager
 from io import StringIO
 from unittest import mock
@@ -14,6 +16,20 @@ from . import similarity
 from .models import Deadline, Episode, Source, Topic
 
 SEOUL = datetime.timezone(datetime.timedelta(hours=9))
+
+FIXTURE = (
+    pathlib.Path(__file__).resolve().parent / 'fixtures' / 'initial_episodes.json'
+)
+
+
+def fixture_count(model):
+    """시드 fixture에 든 해당 모델의 건수.
+
+    숫자를 테스트에 박아두면 편이 늘 때마다 관계없는 테스트가 깨진다.
+    세는 대상을 fixture 자신으로 두면 '적재된 것과 적힌 것이 같은가'만 검사한다.
+    """
+    rows = json.loads(FIXTURE.read_text(encoding='utf-8'))
+    return sum(1 for r in rows if r['model'] == model)
 
 
 @contextmanager
@@ -451,7 +467,7 @@ class SeedTopicTests(TestCase):
     fixtures = ['initial_episodes.json']
 
     def test_seeded_topics_exist(self):
-        self.assertEqual(Topic.objects.count(), 2)
+        self.assertEqual(Topic.objects.count(), fixture_count('episodes.topic'))
 
     def test_accident_topic_counts_only_the_published_episode(self):
         topic = Topic.objects.get(name='AI 평가장 사고')
@@ -492,7 +508,7 @@ class SeedFixtureTests(TestCase):
     fixtures = ['initial_episodes.json']
 
     def test_fixture_loads_all_records(self):
-        self.assertEqual(Episode.objects.count(), 10)
+        self.assertEqual(Episode.objects.count(), fixture_count('episodes.episode'))
 
     def test_canceled_episode_kept_its_reason(self):
         episode = Episode.objects.get(number=8)
