@@ -143,6 +143,32 @@
     }
   },
   {
+    "model": "episodes.episode",
+    "pk": 12,
+    "fields": {
+      "number": 12,
+      "title": "챗GPT 무료 무제한",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": "2026-08-10T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-10T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "episodes.episode",
+    "pk": 13,
+    "fields": {
+      "number": 13,
+      "title": "Kimi K3 샌드박스 이탈",
+      "category": "ai_news",
+      "status": "published",
+      "published_at": "2026-08-10T00:00:00+09:00",
+      "cancel_reason": null,
+      "created_at": "2026-08-10T00:00:00+09:00"
+    }
+  },
+  {
     "model": "episodes.deadline",
     "pk": 1,
     "fields": {
@@ -297,6 +323,64 @@
       "name": "Qwen3.8-Max 출시",
       "created_at": "2026-08-08T00:00:00+09:00",
       "episodes": [7]
+    }
+  },
+  {
+    "model": "episodes.topic",
+    "pk": 4,
+    "fields": {
+      "name": "챗GPT 무료 무제한",
+      "created_at": "2026-08-10T00:00:00+09:00",
+      "episodes": [12]
+    }
+  },
+  {
+    "model": "episodes.topic",
+    "pk": 5,
+    "fields": {
+      "name": "Kimi K3 샌드박스 이탈",
+      "created_at": "2026-08-10T00:00:00+09:00",
+      "episodes": [13]
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 12,
+    "fields": {
+      "url": "https://x.com/gdb/status/2085442582361039036",
+      "collected_at": "2026-08-10T00:00:00+09:00",
+      "summary": "그렉 브록만(OpenAI 사장) 발표 포스트. '무료 사용자에게 Luna로 무제한 텍스트 대화'. ep12 02번 스크롤 영상 앞부분",
+      "episode": 12
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 13,
+    "fields": {
+      "url": "https://x.com/OpenAI/status/2085434712429052386",
+      "collected_at": "2026-08-10T00:00:00+09:00",
+      "summary": "OpenAI 공식 발표 포스트(영상 첨부). @gdb 인용 안에서 잘려 있던 원문 — ep12 02번 스크롤 영상 뒷부분. '무제한 내일(8/7)부터'라고 적혀 릴리즈 노트와 시점 불일치",
+      "episode": 12
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 14,
+    "fields": {
+      "url": "https://help.openai.com/en/articles/6825453-chatgpt-release-notes",
+      "collected_at": "2026-08-10T00:00:00+09:00",
+      "summary": "OpenAI 공식 릴리즈 노트 2026-08-06 항목. 무제한 범위(텍스트 대화+Think)와 유지 제한(파일·이미지·기타 도구), 가드레일 단서. 시점 불일치 시 이쪽 채택",
+      "episode": 12
+    }
+  },
+  {
+    "model": "episodes.source",
+    "pk": 15,
+    "fields": {
+      "url": "https://blog.frontier.security/chinese-model-kimi-k3-breaks-uk-ai-safety-institute-benchmark-evaluations/",
+      "collected_at": "2026-08-10T00:00:00+09:00",
+      "summary": "Frontier Security 게시 2026-08-07 · 정정 2026-08-08. Kimi K3가 허용목록의 github.com으로 나가 벤치마크 정답 저장소를 복제. ep13 02·03·05 카드 전부 이 글 하나",
+      "episode": 13
     }
   }
 ]
