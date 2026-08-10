@@ -963,6 +963,40 @@ SCAN_LOG_SAMPLE = """# 아침 스캔 로그 — 2026-08-09
 """
 
 
+SCAN_LOG_TABLE_SAMPLE = """# 아침 스캔 로그 — 2026-08-10
+
+## 판정 요약
+
+| 후보 | 판정 | 사유 |
+|---|---|---|
+| **딥마인드 CEO 하사비스 물러남** | 내일 1순위 | 기존 Topic과 무관 |
+| Qwen3.8 오픈웨이트 공개 임박 | 대기 | ep7과 같은 제품군 |
+| 엔비디아 초소형 AI 슈퍼컴퓨터 | 비축 | 수치가 기사마다 갈린다 |
+
+## 발행
+
+| 편 | 제목 |
+|---|---|
+| ep11 | 클로드 스킬 큐레이션 |
+"""
+
+
+SCAN_LOG_REPEATED_SAMPLE = """## 판정 요약
+
+| 후보 | 판정 |
+|---|---|
+| 가 | 채택 |
+| 나 | 반려 |
+
+## scan_check 실측
+
+| 후보 | 유사도 |
+|---|---:|
+| 가 | 0.280 |
+| 나 | 0.655 |
+"""
+
+
 class ScanLogParserTests(TestCase):
     """형식이 아직 한 건뿐이라 느슨하게 읽는다 — 대신 실패는 시끄럽게."""
 
@@ -999,13 +1033,70 @@ class ScanLogParserTests(TestCase):
 
     def test_empty_section_is_reported(self):
         with self.assertRaises(_scan_log.ScanLogError) as ctx:
-            _scan_log.parse_candidates('## 후보\n\n표만 있음\n\n| a |\n')
+            _scan_log.parse_candidates('## 후보\n\n표도 목록도 아님\n\n| a |\n')
 
-        self.assertIn('목록 항목이 없습니다', str(ctx.exception))
+        self.assertIn('읽을 항목이 없습니다', str(ctx.exception))
 
-    def test_tables_are_not_read(self):
+
+class ScanLogTableTests(TestCase):
+    """후보가 표로 적힌 로그. 실제 스캔 로그가 이 모양이다."""
+
+    def test_reads_first_column_of_a_candidate_table(self):
+        items = _scan_log.parse_candidates(SCAN_LOG_TABLE_SAMPLE)
+
+        self.assertEqual(
+            items,
+            ['딥마인드 CEO 하사비스 물러남', 'Qwen3.8 오픈웨이트 공개 임박',
+             '엔비디아 초소형 AI 슈퍼컴퓨터'],
+        )
+
+    def test_table_heading_does_not_need_the_word(self):
+        """실제 로그의 후보 표는 `## 판정 요약` 아래에 있다 — 제목엔 '후보'가 없다."""
+        items = _scan_log.parse_candidates(
+            '## 판정 요약\n| 후보 | 판정 |\n|---|---|\n| 가 | 채택 |\n')
+
+        self.assertEqual(items, ['가'])
+
+    def test_tables_without_a_candidate_header_are_ignored(self):
         with self.assertRaises(_scan_log.ScanLogError):
-            _scan_log.parse_candidates('## 후보\n| 후보 | 판정 |\n|---|---|\n| 가 | 나 |\n')
+            _scan_log.parse_candidates(
+                '## 발행\n| 편 | 제목 |\n|---|---|\n| ep11 | 클로드 스킬 |\n')
+
+    def test_same_candidate_in_several_tables_is_deduped_in_order(self):
+        """판정 요약 · scan_check 실측 · 자동 스캔에 같은 후보가 반복되는 것이 정상."""
+        items = _scan_log.parse_candidates(SCAN_LOG_REPEATED_SAMPLE)
+
+        self.assertEqual(items, ['가', '나'])
+
+    def test_list_and_table_are_merged_with_list_first(self):
+        items = _scan_log.parse_candidates(
+            '## 후보\n- 목록것\n\n## 판정 요약\n| 후보 | 판정 |\n|---|---|\n| 표것 |  |\n')
+
+        self.assertEqual(items, ['목록것', '표것'])
+
+    def test_emphasis_is_stripped_from_table_cells(self):
+        items = _scan_log.parse_candidates(
+            '| 후보 | 판정 |\n|---|---|\n| **굵은 후보** | 채택 |\n')
+
+        self.assertEqual(items, ['굵은 후보'])
+
+    def test_blank_first_cells_are_skipped(self):
+        items = _scan_log.parse_candidates(
+            '| 후보 | 판정 |\n|---|---|\n| 가 | 채택 |\n|  | 이어짐 |\n')
+
+        self.assertEqual(items, ['가'])
+
+    def test_alignment_rules_are_accepted(self):
+        items = _scan_log.parse_candidates(
+            '| 후보 | 유사도 |\n|---|---:|\n| 가 | 0.280 |\n')
+
+        self.assertEqual(items, ['가'])
+
+    def test_table_ends_at_the_first_non_row(self):
+        items = _scan_log.parse_candidates(
+            '| 후보 | 판정 |\n|---|---|\n| 가 | 채택 |\n\n본문 문장\n\n- 목록것\n')
+
+        self.assertEqual(items, ['가'])
 
 
 class ScanLogPathTests(TestCase):
