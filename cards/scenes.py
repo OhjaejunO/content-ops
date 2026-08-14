@@ -201,8 +201,17 @@ def save_scene(order, src_png, note=None):
     if os.path.exists(md):
         with open(md, encoding="utf-8") as f:
             t = f.read()
+        # «장면» 열은 **실물**을 적는다 — 의도가 아니다. 여기에 motif(생성 의도)를
+        # 넣으면 색인이 거짓말을 하고, `find_scene` 이 그 거짓말을 그대로 재사용해
+        # 카드에 잘못된 그림이 규칙을 지킨 채로 실린다 (2026-08-14 클로디 폴더 실제 사고).
+        # 그래서 note 가 없을 때 motif 로 때우지 않는다 — 채워야 한다는 표시를 남긴다.
+        if note:
+            scene = note
+        else:
+            scene = "⚠️ 실물 미기록 — 그림을 열어 보이는 대로 채울 것"
+            print(f"[scenes] {fn}: note= 없이 저장했다. «장면» 열은 실물을 적어야 한다.")
         row = (f"| `{fn}` | **{order['concept']}** | {order['concept']} | "
-               f"{note or order.get('motif', '')[:60]} | {order.get('ratio', '1:1')} |\n")
+               f"{scene} | {order.get('ratio', '1:1')} |\n")
         if fn not in t:
             t = t.replace("\n## 사용 이력", row + "\n## 사용 이력", 1)
             with open(md, "w", encoding="utf-8", newline="\n") as f:
