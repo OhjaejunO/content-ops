@@ -40,6 +40,12 @@ LIB = os.environ.get(
     r"C:\Users\ojaej\orca\tomangchi-lab.github.io\workshop\assets\characters",
 )
 
+#: 로스터에 없는 주체(구글·메타·마누스 등)의 씬이 모이는 폴더.
+#: SKILL §2 는 그런 소식을 **캐릭터 없이 소품만으로** 가라고 한다. 캐릭터가 없다고
+#: 라이브러리 밖에 두면 같은 소품을 매 화 다시 생성하게 되므로, 캐릭터 자리에
+#: 이 버킷을 넣어 조회·저장 경로를 하나로 유지한다.
+PROPS = "props"
+
 #: 개념 → 검색 키워드. index.md 의 «키워드» 열과 같은 내용이다.
 #: 새 개념을 만들면 여기와 index.md 둘 다에 적는다.
 CONCEPTS = {
@@ -47,7 +53,14 @@ CONCEPTS = {
     "pass": ["통과", "허용", "자동", "진행", "pass", "allow", "흘려"],
     "scan": ["검사", "스캐너", "관문", "전수", "scan", "gate", "필터", "분류기"],
     "approve": ["승인", "도장", "허가", "결재", "approve", "stamp"],
+    "deadline": ["마감", "달력", "카운트다운", "기한", "종료일", "deadline", "calendar"],
+    "drop": ["유실", "누락", "떨어짐", "구멍", "사라짐", "소실", "drop", "loss"],
 }
+
+
+def bucket(subject):
+    """씬이 들어갈 폴더 키. 로스터 밖 주체는 전부 `props` 로 모인다."""
+    return card.pick_character(subject) or PROPS
 
 
 def _dir(character):
@@ -95,9 +108,7 @@ def _concept_key(concept):
 
 def find_scene(subject, concept):
     """라이브러리에서 먼저 찾는다. 없으면 None — **생성하지 않는다.**"""
-    ch = card.pick_character(subject)
-    if not ch:
-        return None
+    ch = bucket(subject)
     key = _concept_key(concept)
     if not key:
         return None
@@ -114,7 +125,7 @@ def find_scene(subject, concept):
     return None
 
 
-def get_scene(subject, concept, motif=None):
+def get_scene(subject, concept, motif=None, ratio="1:1"):
     """**라이브러리 우선.** 있으면 그 경로, 없으면 생성 지시서를 돌려준다.
 
     반환(찾음):   {"found": True,  "path": ..., "character": ...}
@@ -123,9 +134,7 @@ def get_scene(subject, concept, motif=None):
     없을 때 motif 를 안 주면 프롬프트를 만들 수 없으므로 에러를 낸다 —
     "생성해야 하는데 뭘 그릴지 안 정했다"를 조용히 넘기지 않는다.
     """
-    ch = card.pick_character(subject)
-    if not ch:
-        raise ValueError(f"로스터에 없는 주체다: {subject!r} — 캐릭터 없이 소품만으로 간다(SKILL §2)")
+    ch = bucket(subject)
 
     hit = find_scene(subject, concept)
     if hit:
@@ -142,9 +151,11 @@ def get_scene(subject, concept, motif=None):
         "found": False,
         "character": ch,
         "concept": concept,
-        "prompt": card.illust_prompt(subject, motif),   # no-text·스타일 고정부 그대로
+        # no-text·스타일 고정부 그대로. ratio 만 구도 지시를 바꾼다(표지=4:5).
+        "prompt": card.illust_prompt(subject, motif, ratio=ratio),
         "save_as": os.path.join(_dir(ch), f"{ch}_{key}.png"),
         "motif": motif,
+        "ratio": ratio,
     }
 
 
@@ -175,7 +186,7 @@ def save_scene(order, src_png, note=None):
         with open(md, encoding="utf-8") as f:
             t = f.read()
         row = (f"| `{fn}` | **{order['concept']}** | {order['concept']} | "
-               f"{note or order.get('motif', '')[:60]} | 1:1 |\n")
+               f"{note or order.get('motif', '')[:60]} | {order.get('ratio', '1:1')} |\n")
         if fn not in t:
             t = t.replace("\n## 사용 이력", row + "\n## 사용 이력", 1)
             with open(md, "w", encoding="utf-8", newline="\n") as f:
