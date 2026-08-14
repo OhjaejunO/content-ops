@@ -55,6 +55,22 @@ CONCEPTS = {
     "approve": ["승인", "도장", "허가", "결재", "approve", "stamp"],
     "deadline": ["마감", "달력", "카운트다운", "기한", "종료일", "deadline", "calendar"],
     "drop": ["유실", "누락", "떨어짐", "구멍", "사라짐", "소실", "drop", "loss"],
+    # ── 설명 포즈 (2026-08-15 신설) ───────────────────────────────────
+    # 증거 카드(캡처·차트·영상)에는 캐릭터를 얹지 않는다(SKILL §6.1) — 실물 위에
+    # 연출을 올리면 증거가 아니게 되기 때문이다. 대신 증거 앞뒤에 캐릭터가 설명하는
+    # 카드를 두고, 그 포즈들이 여기 모인다. 소재와 무관한 순수 포즈라 **편이 바뀌어도
+    # 그대로 재사용된다** — 이 버킷이 재생성을 가장 많이 막아줄 자리다.
+    #
+    # ⚠️ 여기 없는 개념은 `_concept_key` 가 None 을 돌려주고, 그러면 `find_scene` 이
+    # 영원히 못 찾는다. `get_scene` 은 슬러그로 **저장은 하므로** 파일은 쌓이는데
+    # 조회가 안 되는 상태가 된다 — 라이브러리를 만든 이유가 사라진다.
+    # 새 포즈를 쓰기 전에 반드시 이 표에 먼저 올릴 것.
+    "explain": ["설명", "설명하기", "안내", "말하기", "explain", "presenting"],
+    "point": ["가리키기", "가리킴", "지목", "시선", "point", "pointing"],
+    "surprise": ["놀람", "놀라기", "충격", "의외", "surprise", "shocked"],
+    "arms": ["팔짱", "단호", "경고", "arms-crossed", "firm"],
+    "tilt": ["갸웃", "의문", "헷갈림", "tilt", "puzzled"],
+    "cover": ["표지", "커버", "cover"],
 }
 
 
@@ -185,8 +201,17 @@ def save_scene(order, src_png, note=None):
     if os.path.exists(md):
         with open(md, encoding="utf-8") as f:
             t = f.read()
+        # «장면» 열은 **실물**을 적는다 — 의도가 아니다. 여기에 motif(생성 의도)를
+        # 넣으면 색인이 거짓말을 하고, `find_scene` 이 그 거짓말을 그대로 재사용해
+        # 카드에 잘못된 그림이 규칙을 지킨 채로 실린다 (2026-08-14 클로디 폴더 실제 사고).
+        # 그래서 note 가 없을 때 motif 로 때우지 않는다 — 채워야 한다는 표시를 남긴다.
+        if note:
+            scene = note
+        else:
+            scene = "⚠️ 실물 미기록 — 그림을 열어 보이는 대로 채울 것"
+            print(f"[scenes] {fn}: note= 없이 저장했다. «장면» 열은 실물을 적어야 한다.")
         row = (f"| `{fn}` | **{order['concept']}** | {order['concept']} | "
-               f"{note or order.get('motif', '')[:60]} | {order.get('ratio', '1:1')} |\n")
+               f"{scene} | {order.get('ratio', '1:1')} |\n")
         if fn not in t:
             t = t.replace("\n## 사용 이력", row + "\n## 사용 이력", 1)
             with open(md, "w", encoding="utf-8", newline="\n") as f:
