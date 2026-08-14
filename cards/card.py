@@ -96,14 +96,38 @@ CHARACTERS = {
         "look": ("Codie, a sky-blue flower-blob plush with a navy window face showing "
                  "a `>_` prompt"),
     },
+    "manu": {
+        "name": "마누",
+        "element": "db952663-f6f6-41f2-8c39-493a842edf26",
+        "owns": "Manus",
+        "look": ("Manu, a plush mascot whose whole body is a soft rounded hand, "
+                 "cream-white plush with bold charcoal outline piping tracing every "
+                 "edge and finger, three short charcoal accent strokes floating above, "
+                 "big glossy eyes and a small stitched smile on the back of the hand"),
+    },
+    "groki": {
+        "name": "그로키",
+        "element": "2103c070-a6f9-486f-a65c-093c3e34702b",
+        "owns": "Grok / xAI / SpaceXAI (Grok Bot 포함)",
+        "look": ("Grokie, a rounded cream-white plush mascot with short stubby arms "
+                 "and legs, big glossy eyes and a calm smile, one large black emblem "
+                 "embroidered flat on its belly — a bold ring cut through by a "
+                 "diagonal blade tapering to sharp points beyond the ring"),
+    },
 }
 
 #: 주체 문자열 → 캐릭터 키. 소문자로 매칭한다.
+#: **순서가 곧 우선순위다** — 먼저 걸리는 항목이 이긴다(§2 "좁은 것이 이긴다").
+#: 그록·마누스는 기존 항목과 문자열이 겹치지 않아 뒤에 붙여도 판정이 바뀌지 않는다.
+#: 그록 봇은 그록의 제품이므로 **따로 두지 않고 그로키가 맡는다** — 봇 로고를
+#: 우리 캐릭터로 다시 만들면 모작이 되기 때문이다(SKILL §2).
 _SUBJECT_MAP = [
     (("anthropic", "claude", "클로드", "앤트로픽"), "claudie"),
     (("codex", "코덱스"), "codie"),
     (("openai", "chatgpt", "gpt", "오픈ai", "챗gpt"), "gpty"),
     (("qwen", "alibaba", "큐원", "알리바바"), "kyu"),
+    (("manus", "마누스"), "manu"),
+    (("grok", "그록", "xai", "spacexai", "엑스ai"), "groki"),
 ]
 
 
