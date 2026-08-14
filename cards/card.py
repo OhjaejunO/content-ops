@@ -237,14 +237,51 @@ def _base():
 
 
 def _paste_illust(canvas, path, top_h):
-    """상단 비주얼 — 덮기(cover). 1:1 일러스트는 위아래가 잘리므로
-    프롬프트의 `generous empty space` 가 그 여유를 만든다."""
+    """상단 비주얼 — 덮기(cover) 후 **밴드 크기로 잘라서** 붙인다.
+
+    자르지 않고 그대로 붙이면 넘치는 부분이 하단 텍스트 영역을 침범한다.
+    1:1 일러스트(1024²)를 1080 폭에 맞추면 세로가 1080이 되어 상단 밴드(776)를
+    304px 넘기고, 그 회색 배경이 번호·헤드라인 뒤에 깔린다 — 2026-08-14 실제 사고.
+
+    반환: 실제로 붙인 밴드 높이 (호출부 검증용).
+    """
     im = Image.open(path).convert("RGB")
     sc = max(W / im.width, top_h / im.height)
     nw, nh = round(im.width * sc), round(im.height * sc)
     im = im.resize((nw, nh), Image.LANCZOS)
+
     # 세로 중앙 — 캡처와 달리 일러스트는 주인공이 가운데 있다.
-    canvas.paste(im, ((W - nw) // 2, (top_h - nh) // 2))
+    ox, oy = (nw - W) // 2, (nh - top_h) // 2
+    band = im.crop((ox, oy, ox + W, oy + top_h))
+
+    # 검증 ① 밴드 크기가 지정 비율과 정확히 같은가
+    assert band.size == (W, top_h), f"일러스트 밴드 크기 불일치: {band.size} != {(W, top_h)}"
+    # 검증 ② 이미지가 실제로 붙었는가 (단색·빈 이미지면 명암폭이 거의 없다)
+    lo, hi = band.convert("L").getextrema()
+    assert hi - lo > 12, f"일러스트가 비었거나 단색이다 (명암폭 {hi - lo}): {path}"
+
+    canvas.paste(band, (0, 0))
+    return top_h
+
+
+def _paste_cutout(canvas, path, body_end_y):
+    """텍스트 카드 우하단 캐릭터 누끼 (SKILL §6 3조건).
+
+    ① 가독성을 침범하지 않는 위치(우하단) ② 카드 폭의 1/4 이하
+    ③ **소스 캡처 카드에는 금지** — 캡처는 증거라 위에 아무것도 얹지 않는다.
+    ③은 호출부가 지킨다. 이 함수는 ①②만 강제한다.
+    """
+    if not path or not os.path.exists(path):
+        return
+    cut = Image.open(path).convert("RGBA")
+    cw = W // 4
+    cut = cut.resize((cw, max(1, round(cut.height * cw / cut.width))), Image.LANCZOS)
+    lg = _load_logo()
+    # 본문 끝과 출처 줄 사이 빈 공간의 가운데. 로고·출처와 겹치지 않게 둔다.
+    zone_top = body_end_y + 20
+    zone_bottom = H - lg.height - CREDIT_GAP - 12
+    cy = zone_top + max(0, (zone_bottom - zone_top - cut.height) / 2)
+    canvas.alpha_composite(cut, (W - cw - 56, round(cy)))
 
 
 def _footer(canvas, credit):
@@ -272,14 +309,16 @@ def _head_block(canvas, no, headline, y):
 
 
 # ── 카드 2종 ────────────────────────────────────────────────────────
-def news_card(no, headline, body, illust, credit, out, top=TOP):
+def news_card(no, headline, body, illust, credit, out, top=TOP, cutout=None):
     """본문형 (기본) — 일러스트 + 헤드라인 + 본문(키워드 강조).
 
     body 는 줄 리스트. `**키워드**` 로 감싼 부분이 시안 볼드로 렌더된다.
+    cutout = 담당 캐릭터 누끼(우하단 소형, §6 3조건). **소스 캡처 카드에는 주지 말 것.**
     """
     canvas = _base()
     top_h = round(H * top)
-    _paste_illust(canvas, illust, top_h)
+    band_h = _paste_illust(canvas, illust, top_h)
+    assert band_h == round(H * top), f"상단 밴드 높이 불일치: {band_h} != {round(H * top)}"
 
     y = _head_block(canvas, no, headline, top_h + 40) + 16
     d = ImageDraw.Draw(canvas)
@@ -289,12 +328,13 @@ def news_card(no, headline, body, illust, credit, out, top=TOP):
         _draw_emph(d, PAD_X, y, ln, fb.size, W - PAD_X * 2)
         y += round(fb.size * 1.52)
 
+    _paste_cutout(canvas, cutout, y)
     _footer(canvas, credit)
     canvas.convert("RGB").save(out, quality=95)
     return out
 
 
-def news_card_chart(no, headline, rows, body, illust, credit, out, top=0.42):
+def news_card_chart(no, headline, rows, body, illust, credit, out, top=0.42, cutout=None):
     """차트형 — 미니 가로 막대. 수치 소재용.
 
     rows = [(라벨, 값, 표시문자열, 강조여부), ...]
@@ -306,7 +346,8 @@ def news_card_chart(no, headline, rows, body, illust, credit, out, top=0.42):
     """
     canvas = _base()
     top_h = round(H * top)
-    _paste_illust(canvas, illust, top_h)
+    band_h = _paste_illust(canvas, illust, top_h)
+    assert band_h == round(H * top), f"상단 밴드 높이 불일치: {band_h} != {round(H * top)}"
 
     y = _head_block(canvas, no, headline, top_h + 40) + 28
     d = ImageDraw.Draw(canvas)
@@ -335,6 +376,7 @@ def news_card_chart(no, headline, rows, body, illust, credit, out, top=0.42):
         _draw_emph(d, PAD_X, y, ln, fb.size, W - PAD_X * 2)
         y += round(fb.size * 1.52)
 
+    _paste_cutout(canvas, cutout, y)
     _footer(canvas, credit)
     canvas.convert("RGB").save(out, quality=95)
     return out
