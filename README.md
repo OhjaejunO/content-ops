@@ -276,9 +276,26 @@ Meta 건은 동일 사건 재탕이 아니라 새 사건(세 번째 회사)입�
 사건에 확실히 붙지는 않는다"는 신호입니다. 1위가 2위를 크게 따돌릴 때 그 사건과 같은
 건일 가능성이 높고, 그때 노출 횟수를 함께 봐야 합니다.
 
+## 카드 조립기 (`cards/`)
+
+발행 카드를 코드로 조립하는 모듈입니다. 3D 일러스트를 상단에 넣고,
+번호·헤드라인·본문·출처·로고를 규격대로 렌더합니다.
+
+```python
+import card
+prompt = card.illust_prompt("Anthropic", "pressing an approval stamp onto papers")
+card.news_card(no="01", headline="...", body=["... **키워드** ..."],
+               illust="shots/_illust.png", credit="claude.com/blog",
+               out="out/02.png")
+```
+
+**일러스트에는 글자를 넣지 않습니다** — 생성 모델은 한글을 못 쓰고 없는 숫자를
+지어냅니다. 카드에 보이는 텍스트·수치는 전부 이 모듈이 렌더합니다.
+자세한 사용법은 [`cards/README.md`](cards/README.md).
+
 ## 기술 스택
 
-Django 6.1 · SQLite · Python 3.14
+Django 6.1 · SQLite · Python 3.14 · Pillow(카드 조립)
 
 혼자 쓰는 도구이고 데이터도 많지 않아 SQLite로 시작합니다.
 DB를 바꿔야 할 이유가 실제로 생기기 전까지는 바꾸지 않습니다.
