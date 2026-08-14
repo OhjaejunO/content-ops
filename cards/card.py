@@ -121,31 +121,45 @@ def pick_character(subject):
     return None
 
 
-ILLUST_STYLE = (
+_STYLE_HEAD = (
     "Soft matte 3D render, Pixar-like clay toy aesthetic. "
     "Clean light gray studio backdrop, soft gradient, gentle floor shadows, "
     "bright even lighting, teal and white accents. "
-    "Square 1:1, generous empty space. "
-    "Absolutely no text, no letters, no numbers, no labels."
 )
 
+#: 화면비별 구도 지시. 본문 카드는 1:1(상단 밴드에 덮기), 표지는 4:5 상단 2/3 구도다
+#: (SKILL §6). 이 문구를 손으로 고쳐 쓰지 말 것 — 프롬프트를 새로 쓰면 톤이 갈린다.
+_FRAMING = {
+    "1:1": "Square 1:1, generous empty space. ",
+    "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds, "
+            "calm empty floor across the lower third. "),
+}
 
-def illust_prompt(subject, motif):
+_NO_TEXT = "Absolutely no text, no letters, no numbers, no labels."
+
+#: 기존 호출부 호환 — 1:1 고정부 전문.
+ILLUST_STYLE = _STYLE_HEAD + _FRAMING["1:1"] + _NO_TEXT
+
+
+def illust_prompt(subject, motif, ratio="1:1"):
     """일러스트 생성 프롬프트를 만든다.
 
     subject = 소식 주체("Anthropic" 등) → 캐릭터 자동 배정
     motif   = 뉴스 내용을 은유하는 소품/동작 (영문 1~2문장)
+    ratio   = "1:1"(본문 카드 기본) 또는 "4:5"(표지 — 상단 2/3 구도)
 
     no-text 조항은 고정부라 호출부가 빼먹을 수 없다 — 카드의 글자는 전부
     card.py 가 렌더한다는 것이 이 파이프라인의 전제다.
     """
+    if ratio not in _FRAMING:
+        raise ValueError(f"모르는 화면비다: {ratio!r} (쓸 수 있는 값: {sorted(_FRAMING)})")
     ch = pick_character(subject)
     if ch:
         c = CHARACTERS[ch]
         head = f"<<<{c['element']}>>> {c['look']} — {motif}"
     else:
         head = motif
-    return f"{head} {ILLUST_STYLE}"
+    return f"{head} {_STYLE_HEAD}{_FRAMING[ratio]}{_NO_TEXT}"
 
 
 # ── 렌더 헬퍼 ────────────────────────────────────────────────────────
@@ -236,6 +250,108 @@ def _base():
     return Image.new("RGBA", (W, H), BG + (255,))
 
 
+# ── 원문 조각 (ep14 에서 승격) ────────────────────────────────────────
+# 일러스트가 기본이 된 뒤에도 **근거 문장은 실물로 보여야** 하는 카드가 있다
+# (§6 "논란·반박·정정은 여전히 캡처가 이긴다", "근거가 의심받을 만한 수치").
+# ep14 가 스크립트 안에 들고 있던 조각 크롭 로직을 여기로 옮긴다 — 편마다
+# 복사되면 언젠가 갈린다(§4 색 상수와 같은 이유).
+
+def line_bands(path, thresh=200, min_ink=0.002, min_gap=6):
+    """글자 줄의 y 밴드 목록을 돌려준다. 잉크가 있는 행이 이어지는 구간이 한 줄이다."""
+    im = Image.open(path).convert("L")
+    w, h = im.size
+    px = im.load()
+    rows = []
+    for y in range(h):
+        c = sum(1 for x in range(0, w, 3) if px[x, y] < thresh)
+        rows.append(c / (w / 3) > min_ink)
+    out, start, gap = [], None, 0
+    for y, on in enumerate(rows):
+        if on:
+            if start is None:
+                start = y
+            gap = 0
+        else:
+            if start is not None:
+                gap += 1
+                if gap >= min_gap:
+                    out.append((start, y - gap))
+                    start = None
+    if start is not None:
+        out.append((start, h - 1))
+    return [b for b in out if b[1] - b[0] > 10], (w, h)
+
+
+def crop_lines(path, ranges=None, pad=14):
+    """줄 번호 구간들을 **줄 경계**에서 잘라 세로로 잇는다.
+
+    y 좌표로 자르면 문장이 허리에서 끊긴다 — 잘린 문장은 근거 구실을 못 한다.
+    ranges 를 비우면 그 캡처의 전 줄을 쓰되 위아래 여백만 줄 경계로 정리한다.
+    구간이 둘 이상이면 사이에 생략 표시(⋯)를 넣는다 — 중간을 들어냈다는
+    사실이 카드에서 보여야 한다.
+    """
+    bs, (w, h) = line_bands(path)
+    if not bs:
+        raise ValueError(f"글자 줄을 못 찾았다(빈 캡처?): {path}")
+    if ranges is None:
+        ranges = [(0, len(bs) - 1)]
+    for first, last in ranges:
+        assert last < len(bs), (
+            f"{os.path.basename(path)}: {last}행을 요구했는데 {len(bs)}행뿐이다")
+    src = Image.open(path).convert("RGB")
+    pieces = [src.crop((0, max(0, bs[f][0] - pad), w, min(h, bs[l][1] + pad)))
+              for f, l in ranges]
+    return stack_pieces(pieces)
+
+
+def stack_pieces(pieces, gap_h=62, bg=None, mark=(150, 158, 168)):
+    """조각들을 세로로 잇고 사이마다 생략 표시(⋯)를 찍는다.
+
+    bg 를 안 주면 첫 조각의 좌상단 픽셀을 배경으로 쓴다 — 원문이 순백이 아닌
+    페이지(크림 배경 블로그 등)에서 이음매가 흰 띠로 튀는 것을 막는다.
+    """
+    if len(pieces) == 1:
+        return pieces[0]
+    w = max(pc.width for pc in pieces)
+    if bg is None:
+        bg = pieces[0].convert("RGB").getpixel((1, 1))
+    total = sum(pc.height for pc in pieces) + gap_h * (len(pieces) - 1)
+    out = Image.new("RGB", (w, total), bg)
+    d = ImageDraw.Draw(out)
+    y = 0
+    for i, pc in enumerate(pieces):
+        out.paste(pc, ((w - pc.width) // 2, y))
+        y += pc.height
+        if i < len(pieces) - 1:
+            # 카드에서 이 조각은 크게 줄어든다. 작게 찍으면 먼지처럼 보여
+            # 생략 표시 구실을 못 한다 — 실물 확인 후 키운 값(ep14).
+            f = font(52, 800)
+            tw = d.textlength("⋯", font=f)
+            d.text(((w - tw) / 2, y + 2), "⋯", font=f, fill=mark)
+            y += gap_h
+    return out
+
+
+def evidence(canvas, crop_im, y, w, label, label_fill=(168, 177, 188)):
+    """원문 조각 + 테두리 + 출처 라벨. 넘치면 **소리내어 죽는다.**
+
+    조용히 잘리면 발행팩 기재와 산출물이 어긋난 채로 남는다 (ep14 실제 사고).
+    반환: 라벨까지 포함한 아래쪽 y.
+    """
+    sc = w / crop_im.width
+    im = crop_im.resize((w, round(crop_im.height * sc)), Image.LANCZOS)
+    bottom = y + im.height + 56
+    assert bottom <= canvas.height, (
+        f"근거 조각이 캔버스를 {bottom - canvas.height}px 넘친다 "
+        f"(y={y}, 조각높이={im.height}, 캔버스={canvas.height}) — 도해를 줄여라")
+    x = (canvas.width - w) // 2
+    canvas.paste(im, (x, y))
+    d = ImageDraw.Draw(canvas)
+    d.rectangle([x - 1, y - 1, x + w, y + im.height], outline=(226, 231, 235), width=2)
+    d.text((x, y + im.height + 12), label, font=font(26, 600), fill=label_fill)
+    return bottom
+
+
 def _paste_illust(canvas, path, top_h):
     """상단 비주얼 — 덮기(cover) 후 **밴드 크기로 잘라서** 붙인다.
 
@@ -284,6 +400,22 @@ def _paste_cutout(canvas, path, body_end_y):
     canvas.alpha_composite(cut, (W - cw - 56, round(cy)))
 
 
+def _room_check(y, credit, what="본문"):
+    """본문 끝이 출처 줄·로고를 밀고 들어갔는지 검사한다.
+
+    출처 줄과 로고는 본문 길이와 무관하게 **고정 위치**라(자리가 흔들리면 안 되므로),
+    본문이 길어지면 조용히 겹쳐 찍힌다. 겹친 카드는 육안 검수에서야 발견되고
+    그때는 이미 발행팩에 '3줄'이라고 적혀 있다 — ep14 근거 잘림과 같은 경로다.
+    줄이는 것은 사람이 정한다(§5.8: 정보가 많으면 줄이지 말고 장수로 분산).
+    """
+    lg = _load_logo()
+    limit = H - lg.height - (CREDIT_GAP if credit else LOGO_BOTTOM) - 12
+    assert y <= limit, (
+        f"{what}이 {round(y - limit)}px 넘쳐 "
+        f"{'출처 줄' if credit else '로고'}를 덮는다 (끝 y={round(y)}, 한계={limit}) "
+        f"— 줄을 줄이거나 카드를 나눠라")
+
+
 def _footer(canvas, credit):
     """출처 + 로고 워터마크(하단 중앙). 출처는 로고 바로 위 고정 —
     본문 줄 수가 달라져도 자리가 흔들리지 않는다."""
@@ -294,10 +426,23 @@ def _footer(canvas, credit):
     canvas.paste(lg, ((W - lg.width) // 2, H - lg.height - LOGO_BOTTOM), lg)
 
 
-def _head_block(canvas, no, headline, y):
-    """번호 → 헤드라인. §6.1 순서 고정."""
+def _head_block(canvas, no, headline, y, badge=None):
+    """번호/배지 → 헤드라인. §6.1 순서 고정.
+
+    badge 는 번호를 **대체한다** — 둘 다 그리지 않는다. 의견 카드가 소식 카드로
+    읽히면 안 되므로 성격 표시(배지)가 순번(번호)보다 우선이다. ep11~13 의
+    코멘트 카드가 배지를 달고 나갔고 그 문법을 유지한다.
+    """
     d = ImageDraw.Draw(canvas)
-    if no:
+    if badge:
+        fb = font(30, 800)
+        bw = d.textlength(badge, font=fb) + 56
+        bh = 58
+        d.rounded_rectangle([PAD_X, y, PAD_X + bw, y + bh],
+                            radius=bh // 2, outline=CYAN_D, width=3)
+        d.text((PAD_X + 28, y + (bh - fb.size * 1.34) / 2), badge, font=fb, fill=CYAN_D)
+        y += bh + 20
+    elif no:
         d.text((PAD_X, y), str(no), font=font(44, 900), fill=CYAN_D)
         y += 64
     lines = _wrap(d, headline, 54, 900, W - PAD_X * 2)
@@ -309,24 +454,31 @@ def _head_block(canvas, no, headline, y):
 
 
 # ── 카드 2종 ────────────────────────────────────────────────────────
-def news_card(no, headline, body, illust, credit, out, top=TOP, cutout=None):
+def news_card(no, headline, body, illust, credit, out, top=TOP, cutout=None,
+              kicker=None, badge=None):
     """본문형 (기본) — 일러스트 + 헤드라인 + 본문(키워드 강조).
 
     body 는 줄 리스트. `**키워드**` 로 감싼 부분이 시안 볼드로 렌더된다.
     cutout = 담당 캐릭터 누끼(우하단 소형, §6 3조건). **소스 캡처 카드에는 주지 말 것.**
+    kicker = 헤드라인과 본문 사이 소형 시안 라벨("토망치랩 요약" 등, ep11~13 관습).
+    badge  = 번호 자리를 대신하는 테두리 알약("토망치 코멘트" 등). 번호보다 우선.
     """
     canvas = _base()
     top_h = round(H * top)
     band_h = _paste_illust(canvas, illust, top_h)
     assert band_h == round(H * top), f"상단 밴드 높이 불일치: {band_h} != {round(H * top)}"
 
-    y = _head_block(canvas, no, headline, top_h + 40) + 16
+    y = _head_block(canvas, no, headline, top_h + 40, badge=badge) + 16
     d = ImageDraw.Draw(canvas)
+    if kicker:
+        d.text((PAD_X, y), kicker, font=font(27, 800), fill=CYAN_D)
+        y += 46
     plain = [_strip_emph(l) for l in body]
     fb = _fit(d, plain, 30, 500, W - PAD_X * 2)
     for ln in body:
         _draw_emph(d, PAD_X, y, ln, fb.size, W - PAD_X * 2)
         y += round(fb.size * 1.52)
+    _room_check(y, credit)
 
     _paste_cutout(canvas, cutout, y)
     _footer(canvas, credit)
@@ -375,6 +527,7 @@ def news_card_chart(no, headline, rows, body, illust, credit, out, top=0.42, cut
     for ln in body:
         _draw_emph(d, PAD_X, y, ln, fb.size, W - PAD_X * 2)
         y += round(fb.size * 1.52)
+    _room_check(y, credit)
 
     _paste_cutout(canvas, cutout, y)
     _footer(canvas, credit)
