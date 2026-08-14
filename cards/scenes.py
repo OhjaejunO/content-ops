@@ -170,10 +170,18 @@ def get_scene(subject, concept, motif=None, ratio="1:1"):
     if not motif:
         raise ValueError(f"'{concept}' 씬이 라이브러리에 없다. 생성하려면 motif 를 줘야 한다.")
 
-    # 한글 개념어를 ascii 로만 걸러내면 이름이 통째로 비어 claudie_.png 가 된다.
-    key = _concept_key(concept) or re.sub(r"[^0-9a-z가-힣]+", "-", concept.lower()).strip("-")
+    # CONCEPTS 에 없으면 **저장 자체를 막는다.**
+    # 종전에는 한글 개념어를 그대로 슬러그로 써서 `groki_로그인해서-일함.png` 같은
+    # 파일을 만들었다. 그런데 `_load_index` 의 정규식은 `[a-z0-9\-]` 만 받는다 —
+    # 한글 파일명은 색인에 **영원히 안 잡힌다.** 저장은 되는데 조회가 안 되니
+    # 다음 편이 같은 씬을 또 생성한다. 조용히 새는 크레딧이라 여기서 끊는다.
+    key = _concept_key(concept)
     if not key:
-        raise ValueError(f"개념어에서 파일명을 만들 수 없다: {concept!r}")
+        raise ValueError(
+            f"'{concept}' 는 CONCEPTS 에 없다. scenes.CONCEPTS 와 해당 캐릭터의 "
+            f"index.md 에 먼저 등재할 것 — 등재 없이 저장하면 색인에 안 잡히는 "
+            f"파일이 쌓인다."
+        )
     return {
         "found": False,
         "character": ch,
