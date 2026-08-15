@@ -82,6 +82,28 @@ CONCEPTS = {
     "shared-computer": ["컴퓨터 공유", "한 대 공유", "공유 컴퓨터", "권한 공유",
                         "shared-computer"],
     "handoff": ["인계", "넘겨줌", "결과물 전달", "handoff"],
+    # ── 지피(OpenAI) 상황 씬 — 속도·등급·측정조건 계열 (2026-08-15 신설) ──────
+    # 울트라패스트 편에서 6장을 생성해 놓고 **여기 등재를 빠뜨렸다.** 파일과
+    # scenes.json 은 멀쩡한데 `_concept_key` 가 None 을 돌려 `find_scene` 이
+    # 영원히 못 찾는 상태였다 — 다음 편이 같은 그림을 다시 생성한다.
+    # 저장을 막는 가드(`get_scene`)는 있었지만 그 가드를 **거치지 않고** 저장하면
+    # 그만이라, 이번엔 `self_test()` 로 «색인에서 되찾아지는가»를 직접 본다.
+    #
+    # ⚠️ 순서가 판정을 바꾼다 — 먼저 걸리는 항목이 이긴다(`_SUBJECT_MAP` 과 같은 규칙).
+    # `different-start-lines` 를 `two-clocks` 보다 **앞에** 둔다. 뒤에 두면
+    # "비교 조건" 이 two-clocks 의 "비교" 에 먼저 걸려 엉뚱한 씬이 잡힌다.
+    "same-brain-faster-hands": ["속도", "가속", "빠름", "지연", "실시간", "저지연",
+                                "speed", "faster", "latency"],
+    "same-box-express-tag": ["등급", "티어", "서비스 등급", "옵션", "같은 모델",
+                             "tier", "service tier"],
+    "different-start-lines": ["측정 조건", "비교 조건", "기준이 다름", "출발선",
+                              "공정하지 않음", "다른 날", "baseline", "conditions"],
+    "two-clocks": ["시간", "소요", "몇 시간", "비교", "벤치마크", "완주",
+                   "duration", "elapsed"],
+    "thinks-longer-vs-answers-faster": ["혼동", "구분", "갈림길", "모드 차이",
+                                        "이름이 비슷", "ultra", "오래 생각"],
+    "narrow-door": ["제한", "프리뷰", "초대제", "대기", "일부 고객", "미공개",
+                    "preview", "limited", "waitlist"],
 }
 
 
@@ -122,12 +144,16 @@ def _save_index(character, idx):
         json.dump(idx, f, ensure_ascii=False, indent=2)
 
 
-def _concept_key(concept):
-    """한국어·영어 개념어를 라이브러리 키로 정규화한다."""
+def _concept_key(concept, table=None):
+    """한국어·영어 개념어를 라이브러리 키로 정규화한다.
+
+    `table` 은 `self_test()` 가 합성 표를 넣어 보기 위한 자리다 — 평소엔 비운다.
+    """
+    t = CONCEPTS if table is None else table
     c = (concept or "").strip().lower()
-    if c in CONCEPTS:
+    if c in t:
         return c
-    for key, words in CONCEPTS.items():
+    for key, words in t.items():
         if any(w in c for w in words):
             return key
     return None
@@ -242,6 +268,49 @@ def save_scene(order, src_png, note=None):
     return dst
 
 
+# ── 색인 자기검사 ────────────────────────────────────────────────────
+# 이 라이브러리의 유일한 존재 이유는 **다시 찾아지는 것**이다. 찾아지지 않으면
+# 파일이 아무리 잘 쌓여도 다음 편이 같은 그림을 다시 생성한다 — 크레딧이 조용히
+# 샌다(정관 §0 «조용히 실패하는 코드»). 그래서 «등재된 말이 자기 개념으로
+# 되돌아오는가»를 코드가 직접 본다.
+#
+# 잡는 것은 두 가지다.
+#   ① 미등재 — `_concept_key` 가 None. 저장은 되는데 조회가 안 되는 상태.
+#   ② 그림자 — 앞선 개념의 키워드가 뒤 개념의 말을 먼저 삼킨다. 이쪽이 더 고약하다.
+#      **None 이 아니라 «엉뚱한 그림»이 잡히므로** 규칙을 지킨 채 잘못된 씬이 실린다.
+
+
+def _shadow_check(table):
+    """`[(개념, 종류, 입력, 실제)]` — 비어 있으면 표가 자기일관적이다."""
+    bad = []
+    for key, words in table.items():
+        got = _concept_key(key, table)
+        if got != key:
+            bad.append((key, "슬러그", key, got))
+        for w in words:
+            got = _concept_key(w, table)
+            if got != key:
+                bad.append((key, "키워드", w, got))
+    return bad
+
+
+#: 역검증 — **일부러 그림자를 만든 표.** 반드시 걸려야 한다.
+#: 이게 없으면 `_shadow_check` 가 늘 빈 목록을 돌려주는 고장이라도 «통과»로 읽힌다.
+#: `비교` 가 앞에 있어 뒤 개념의 `비교 조건` 을 삼키는 형태 — 실제로 이번에
+#: 순서를 잘못 두면 났을 바로 그 충돌이다.
+_SHADOW_FIXTURE = {
+    "two-clocks": ["비교"],
+    "different-start-lines": ["비교 조건"],
+}
+
+
+def self_test():
+    """`(정상표_실패목록, 역검증_통과여부)`."""
+    live = _shadow_check(CONCEPTS)
+    caught = _shadow_check(_SHADOW_FIXTURE)
+    return live, bool(caught)
+
+
 def rebuild_index(character):
     """폴더 실물에서 scenes.json 을 다시 만든다 (수동 정리 후 동기화용)."""
     idx = {}
@@ -252,3 +321,22 @@ def rebuild_index(character):
             idx.setdefault(m.group(1), []).append(fn)
     _save_index(character, idx)
     return idx
+
+
+if __name__ == "__main__":
+    import io as _io
+    import sys as _sys
+
+    # 콘솔 코드페이지가 cp949 라 한글·em dash 가 그대로는 못 찍힌다.
+    _sys.stdout = _io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8",
+                                    errors="replace")
+
+    live, caught = self_test()
+    print("[색인 자기검사]")
+    for key, kind, val, got in live:
+        print(f"  FAIL {key:32} {kind} {val!r} -> {got}")
+    print(f"  {'OK  ' if not live else 'FAIL'} 정상표 — 개념 {len(CONCEPTS)}개, "
+          f"충돌 {len(live)}건")
+    print(f"  {'OK  ' if caught else 'FAIL'} 역검증 — 일부러 만든 그림자를 "
+          f"{'잡았다' if caught else '못 잡았다 (검사가 헛돈다)'}")
+    _sys.exit(0 if not live and caught else 1)

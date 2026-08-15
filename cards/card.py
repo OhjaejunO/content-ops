@@ -35,6 +35,22 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont
 
+import freshness
+
+# ── 신선도 검사 (2026-08-15 신설) ────────────────────────────────────
+# **임포트되는 순간 이 클론이 origin/main 을 따라잡았는지 본다.**
+#
+# 빌드 스크립트마다 한 줄씩 넣는 방식은 넣는 것을 잊은 스크립트가 곧 구멍이 되고,
+# 구멍이 있는지 아무도 모른다. `content-ops/cards` 를 쓰는 빌드는 전부 이 모듈을
+# 임포트하므로 여기 한 곳이면 새 스크립트도 자동으로 덮인다.
+#
+# 근거: 2026-08-15 지피 씬 6장이 회색 스튜디오 배경으로 나왔다. 프롬프트가 아니라
+# **판본이 낡았던 것**이고(PR #9 미반영), 그 사실을 알리는 신호가 아무 데도 없었다.
+# 크레딧을 쓰고 나서야 실물로 알았다 — 정관 §0 «조용히 실패하는 코드»다.
+#
+# 끄는 법과 이유는 `freshness` 모듈 상단에 적어 뒀다. 끄면 배너가 찍힌다.
+freshness.assert_fresh()
+
 # ── 규격 (정본: workshop/00_브랜드에셋/brand.py · inner.py) ──────────
 # 값을 여기서 바꾸면 워크샵 카드와 문법이 갈린다. 고칠 일이 생기면 정본을
 # 먼저 고치고 이 파일을 맞춘다.
@@ -86,8 +102,15 @@ CHARACTERS = {
         "name": "지피",
         "element": "2c507dad-2e4c-4a02-856a-cc37483407b7",
         "owns": "OpenAI / ChatGPT",
+        # 재질을 두 번 말한다. `a felt wreath` 만으로는 «Pixar-like clay toy»
+        # 고정부에 끌려 플라스티신처럼 매끈하게 나온다 — 1차 생성에서 같은 개념
+        # 두 장 중 한 장이 실제로 그렇게 나왔고, 그 장을 기준샷으로 삼았으면
+        # 이후 씬이 전부 점토로 끌려갔을 것이다(gpty/index.md 2026-08-15).
+        # 종전에는 이 문구를 **호출부가 손으로 붙여 왔다.** 프롬프트를 손으로
+        # 조립하지 말라는 SKILL §6 과 어긋나고, 빠뜨리면 조용히 재질이 갈린다.
         "look": ("Gpty, a felt wreath of six interlocking rings in white and charcoal, "
-                 "no nose"),
+                 "no nose, the body stitched felt with visible fuzzy nap and seams, "
+                 "never smooth clay"),
     },
     "codie": {
         "name": "코디",
