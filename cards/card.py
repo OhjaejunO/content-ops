@@ -145,32 +145,55 @@ def pick_character(subject):
     return None
 
 
+#: 씬이 놓이는 공간. **스튜디오가 아니라 실제 장소**를 그린다.
+#: 씬마다 다르게 할 필요는 없다 — 상황에 맞으면 같은 편 안에서 반복돼도 좋고,
+#: 오히려 같은 사무실이 이어지면 이야기가 이어진다. 상황이 사무실이 아닐 때만
+#: `illust_prompt(..., place=...)` 로 바꾼다 (서버룸·회의실·집 작업실 등).
+DEFAULT_PLACE = ("a quiet modern office corner with a desk, low shelves and a plant, "
+                 "daylight coming from a window to one side")
+
+#: 스타일 고정부. `{place}` 만 호출부가 바꾼다.
+#:
+#: 종전 고정부는 "Clean light gray studio backdrop … teal and white accents" 였다.
+#: 두 가지가 문제였다 — ① 모든 씬이 같은 회색 스튜디오에 떠 있어 상황이 안 읽혔고,
+#: ② `teal accents` 지시가 배경에 **정체불명 청록 도형**으로 나타났다(그로키 씬들
+#: 좌상단·우하단에 실제로 떴다). 브랜드 색은 소품에만 들어가야 한다.
 _STYLE_HEAD = (
     "Soft matte 3D render, Pixar-like clay toy aesthetic. "
-    "Clean light gray studio backdrop, soft gradient, gentle floor shadows, "
-    "bright even lighting, teal and white accents. "
+    "Set in a real place, not a studio: {place}. "
+    "Shallow depth of field — the room falls softly out of focus behind the subject, "
+    "which stays crisp and clearly separated from it. Warm natural daylight. "
+    "Teal appears only on physical props in the scene such as a chair, a laptop or a cable, "
+    "never as floating shapes, gradients or graphic panels in the background. "
 )
 
 #: 화면비별 구도 지시. 본문 카드는 1:1(상단 밴드에 덮기), 표지는 4:5 상단 2/3 구도다
 #: (SKILL §6). 이 문구를 손으로 고쳐 쓰지 말 것 — 프롬프트를 새로 쓰면 톤이 갈린다.
 _FRAMING = {
-    "1:1": "Square 1:1, generous empty space. ",
-    "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds, "
-            "calm empty floor across the lower third. "),
+    "1:1": "Square 1:1, the subject large in frame with calm space around it. ",
+    # 표지는 **글자가 그림 위에 얹히는 유일한 카드**다. `template._scheme` 이 이 구역
+    # 밝기로 잉크/흰 글씨를 고르는데, 배경이 실제 공간이 되면서 그 밝기가 임계선
+    # (brand.LUMA_THRESHOLD=140) 근처로 내려왔다 — 실측 109·125·138 로 색이 흔들렸다.
+    # "calm / low-contrast" 는 **어두워도 만족된다.** 그래서 밝기를 명시한다.
+    "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds; "
+            "the lower third is a plain, brightly lit, unobstructed floor — "
+            "no furniture, no cables and no strong shadows crossing it. "),
 }
 
 _NO_TEXT = "Absolutely no text, no letters, no numbers, no labels."
 
-#: 기존 호출부 호환 — 1:1 고정부 전문.
-ILLUST_STYLE = _STYLE_HEAD + _FRAMING["1:1"] + _NO_TEXT
+#: 기존 호출부 호환 — 1:1 고정부 전문(기본 공간 적용).
+ILLUST_STYLE = _STYLE_HEAD.format(place=DEFAULT_PLACE) + _FRAMING["1:1"] + _NO_TEXT
 
 
-def illust_prompt(subject, motif, ratio="1:1"):
+def illust_prompt(subject, motif, ratio="1:1", place=None):
     """일러스트 생성 프롬프트를 만든다.
 
     subject = 소식 주체("Anthropic" 등) → 캐릭터 자동 배정
     motif   = 뉴스 내용을 은유하는 소품/동작 (영문 1~2문장)
     ratio   = "1:1"(본문 카드 기본) 또는 "4:5"(표지 — 상단 2/3 구도)
+    place   = 씬이 놓이는 실제 공간. 생략하면 `DEFAULT_PLACE`(사무실 한켠).
+              **씬마다 바꿀 필요는 없다** — 상황이 사무실이 아닐 때만 바꾼다.
 
     no-text 조항은 고정부라 호출부가 빼먹을 수 없다 — 카드의 글자는 전부
     card.py 가 렌더한다는 것이 이 파이프라인의 전제다.
@@ -183,7 +206,8 @@ def illust_prompt(subject, motif, ratio="1:1"):
         head = f"<<<{c['element']}>>> {c['look']} — {motif}"
     else:
         head = motif
-    return f"{head} {_STYLE_HEAD}{_FRAMING[ratio]}{_NO_TEXT}"
+    style = _STYLE_HEAD.format(place=place or DEFAULT_PLACE)
+    return f"{head} {style}{_FRAMING[ratio]}{_NO_TEXT}"
 
 
 # ── 렌더 헬퍼 ────────────────────────────────────────────────────────
