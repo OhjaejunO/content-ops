@@ -86,8 +86,15 @@ CHARACTERS = {
         "name": "지피",
         "element": "2c507dad-2e4c-4a02-856a-cc37483407b7",
         "owns": "OpenAI / ChatGPT",
+        # 재질을 두 번 말한다. `a felt wreath` 만으로는 «Pixar-like clay toy»
+        # 고정부에 끌려 플라스티신처럼 매끈하게 나온다 — 1차 생성에서 같은 개념
+        # 두 장 중 한 장이 실제로 그렇게 나왔고, 그 장을 기준샷으로 삼았으면
+        # 이후 씬이 전부 점토로 끌려갔을 것이다(gpty/index.md 2026-08-15).
+        # 종전에는 이 문구를 **호출부가 손으로 붙여 왔다.** 프롬프트를 손으로
+        # 조립하지 말라는 SKILL §6 과 어긋나고, 빠뜨리면 조용히 재질이 갈린다.
         "look": ("Gpty, a felt wreath of six interlocking rings in white and charcoal, "
-                 "no nose"),
+                 "no nose, the body stitched felt with visible fuzzy nap and seams, "
+                 "never smooth clay"),
     },
     "codie": {
         "name": "코디",
