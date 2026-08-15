@@ -152,11 +152,15 @@ def find_scene(subject, concept):
     return None
 
 
-def get_scene(subject, concept, motif=None, ratio="1:1"):
+def get_scene(subject, concept, motif=None, ratio="1:1", place=None):
     """**라이브러리 우선.** 있으면 그 경로, 없으면 생성 지시서를 돌려준다.
 
     반환(찾음):   {"found": True,  "path": ..., "character": ...}
     반환(없음):   {"found": False, "prompt": ..., "save_as": ..., "concept": ..., "character": ...}
+
+    place 는 씬이 놓이는 실제 공간이다. 생략하면 `card.DEFAULT_PLACE`(사무실 한켠).
+    **씬마다 바꿀 필요는 없다** — 같은 편 안에서 공간이 반복되면 오히려 이야기가 이어진다.
+    상황이 사무실이 아닐 때만 바꾼다(서버룸·회의실·집 작업실 등).
 
     없을 때 motif 를 안 주면 프롬프트를 만들 수 없으므로 에러를 낸다 —
     "생성해야 하는데 뭘 그릴지 안 정했다"를 조용히 넘기지 않는다.
@@ -187,7 +191,7 @@ def get_scene(subject, concept, motif=None, ratio="1:1"):
         "character": ch,
         "concept": concept,
         # no-text·스타일 고정부 그대로. ratio 만 구도 지시를 바꾼다(표지=4:5).
-        "prompt": card.illust_prompt(subject, motif, ratio=ratio),
+        "prompt": card.illust_prompt(subject, motif, ratio=ratio, place=place),
         "save_as": os.path.join(_dir(ch), f"{ch}_{key}.png"),
         "motif": motif,
         "ratio": ratio,
