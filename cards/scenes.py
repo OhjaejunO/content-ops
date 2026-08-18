@@ -125,8 +125,15 @@ CONCEPTS = {
 
 
 def bucket(subject):
-    """씬이 들어갈 폴더 키. 로스터 밖 주체는 전부 `props` 로 모인다."""
-    return card.pick_character(subject) or PROPS
+    """씬이 들어갈 폴더 키. 로스터 밖 주체는 전부 `props` 로 모인다.
+
+    캐릭터에 `folder` 가 있으면 그것을 쓴다 — 리디자인된 캐릭터가 구판 씬과 한 폴더에
+    섞이지 않게 하기 위해서다(클로디 v2, 2026-08-19). 없으면 키가 곧 폴더다.
+    """
+    key = card.pick_character(subject)
+    if not key:
+        return PROPS
+    return card.CHARACTERS[key].get("folder", key)
 
 
 def _dir(character):
