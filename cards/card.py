@@ -82,14 +82,28 @@ _MG_RG = r"C:\Windows\Fonts\malgun.ttf"
 # ── 캐릭터 배정 (SKILL §2 로스터) ────────────────────────────────────
 # 소식의 **주체**가 누구냐로 고른다. 도구가 아니라 발표한 회사·제품이 기준이다.
 # element 는 전체 UUID 를 `<<<...>>>` 로 넘긴다 — 축약 8자리는 동작하지 않는다.
+#: 폐기 element — 절대 재사용 금지. 남아 있어도 구버전 조형이 나온다 (SKILL §2 폐기 표와 동기).
+RETIRED_ELEMENTS = {
+    "b3f8b6ec-d250-4d34-ac40-931a9b85eed1": "claudie_final (클로디 v1 · 테라코타 햇살 · 2026-08-19 v2 로 교체)",
+    "6d4b9466-14c0-49af-89b0-02d1b9b15b3d": "claudie (클로디 v1 이전)",
+    "ef2e1dba-e5a9-4270-b6a4-7cb4744b4d2f": "kyu (큐 구버전)",
+    "23b65bbc-835e-449d-b595-7cee1d44be59": "codie (코디 구버전)",
+}
+
 CHARACTERS = {
+    # 클로디 v2 (2026-08-19 교체 · JJ 결정 2026-08-18). v1 은 아래 RETIRED_ELEMENTS.
+    # 신규 편(ep17 이후)부터. 기존 발행분·로고·광고 릴스는 v1 유지 — 소급 교체 없음.
+    # 정본 기록: workshop/assets/characters/claudie_v2/등록준비.md
     "claudie": {
         "name": "클로디",
-        "element": "b3f8b6ec-d250-4d34-ac40-931a9b85eed1",
+        "element": "ca26eff9-4887-410f-8f96-581541d144f2",
         "owns": "Claude / Anthropic",
-        "look": ("Claudie, a plush mascot whose body is a terracotta sunburst, "
-                 "soft fluffy fur, two small arms and two legs between the sun rays, "
-                 "big glossy eyes and a warm smile"),
+        "look": ("Claudie, a toy mascot with a wide rounded-square body in coral (#F07050), "
+                 "smooth matte plastic toy texture, two vertical black rounded-slot eyes "
+                 "set wide apart, no mouth, no nose, two short stubby arms on the sides "
+                 "and four short stubby legs in a row underneath, standing upright"),
+        # 씬 라이브러리 폴더. v1 씬(claudie/)과 섞이지 않게 따로 둔다 — 재질·형태가 다른 캐릭터다.
+        "folder": "claudie_v2",
     },
     "kyu": {
         "name": "큐",
