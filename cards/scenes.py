@@ -5,6 +5,18 @@
 생성은 못 찾았을 때만 일어난다. 호출부가 순서를 뒤집을 수 없도록
 `get_scene()` 하나로 묶어 두었다.
 
+**등재 단위는 포즈가 아니라 상황이다 (2026-08-15 확정).**
+개념명도 상황 기준으로 적는다 — `login-and-work` · `shared-computer` · `two-tests`
+처럼. `explain` · `point` · `surprise` 같은 **포즈명은 등재하지 않는다**
+(`RETIRED_CONCEPTS` 참조). 재사용은 **개념이 반복될 때** 성립한다. 차단·검사·통과처럼
+여러 편에 걸쳐 같은 개념이 나오는 것은 재사용 대상이지만, 포즈는 매 편 상황이 달라
+애초에 재사용 대상이 아니다.
+
+**`find_scene` 이 히트해도 그것으로 끝이 아니다.** 개념이 같아도 이번 카드의 상황과
+다르면 **새로 생성한다.** 재사용은 크레딧 절약 수단이지 목적이 아니다. 안 맞는 씬을
+재사용해 크레딧을 아끼면, 캐릭터가 서 있기만 하는 카드가 나오고 그건 그 카드에
+일러스트가 없는 것과 같다 (ep16 1차 제작에서 02·04·07 이 전부 그렇게 됐다).
+
 라이브러리 위치
     workshop/assets/characters/<캐릭터키>/
         claudie_block-lane.png      실제 씬
@@ -55,21 +67,7 @@ CONCEPTS = {
     "approve": ["승인", "도장", "허가", "결재", "approve", "stamp"],
     "deadline": ["마감", "달력", "카운트다운", "기한", "종료일", "deadline", "calendar"],
     "drop": ["유실", "누락", "떨어짐", "구멍", "사라짐", "소실", "drop", "loss"],
-    # ── 설명 포즈 (2026-08-15 신설) ───────────────────────────────────
-    # 증거 카드(캡처·차트·영상)에는 캐릭터를 얹지 않는다(SKILL §6.1) — 실물 위에
-    # 연출을 올리면 증거가 아니게 되기 때문이다. 대신 증거 앞뒤에 캐릭터가 설명하는
-    # 카드를 두고, 그 포즈들이 여기 모인다. 소재와 무관한 순수 포즈라 **편이 바뀌어도
-    # 그대로 재사용된다** — 이 버킷이 재생성을 가장 많이 막아줄 자리다.
-    #
-    # ⚠️ 여기 없는 개념은 `_concept_key` 가 None 을 돌려주고, 그러면 `find_scene` 이
-    # 영원히 못 찾는다. `get_scene` 은 슬러그로 **저장은 하므로** 파일은 쌓이는데
-    # 조회가 안 되는 상태가 된다 — 라이브러리를 만든 이유가 사라진다.
-    # 새 포즈를 쓰기 전에 반드시 이 표에 먼저 올릴 것.
-    "explain": ["설명", "설명하기", "안내", "말하기", "explain", "presenting"],
-    "point": ["가리키기", "가리킴", "지목", "시선", "point", "pointing"],
-    "surprise": ["놀람", "놀라기", "충격", "의외", "surprise", "shocked"],
-    "arms": ["팔짱", "단호", "경고", "arms-crossed", "firm"],
-    "tilt": ["갸웃", "의문", "헷갈림", "tilt", "puzzled"],
+    # 카드 슬롯 개념 — 포즈가 아니라 자리다. 표지는 편마다 반드시 하나 있다.
     "cover": ["표지", "커버", "cover"],
     # ── 상황 씬 (2026-08-15 신설) ─────────────────────────────────────
     # 포즈가 아니라 **카드 본문이 말하는 상황**을 그린 씬. 범용 포즈만 쓰면 설명 카드가
@@ -121,6 +119,26 @@ CONCEPTS = {
                                 "제각각", "저마다 다르게", "different-labels"],
     "three-labels-laid-out": ["나란히 놓기", "펼쳐 놓기", "층별 정리", "대조표",
                               "견주기", "laid-out", "side-by-side"],
+}
+
+#: **사용 보류된 «포즈» 개념 (2026-08-15).** 등재 단위를 잘못 잡은 흔적이다.
+#:
+#: 처음에는 `explain` · `point` · `surprise` 같은 포즈를 등재하고 "소재와 무관한 순수
+#: 포즈라 편이 바뀌어도 그대로 재사용된다"고 적어 두었다. **그 전제가 틀렸다.**
+#: ep16 1차 제작에서 02·04·07 이 전부 "그로키가 서 있는 비슷한 사진"이 됐고, 카드
+#: 본문이 말하는 상황을 그림이 하나도 보여주지 못했다. 어느 카드에나 맞는 그림은
+#: **어느 카드에도 딱 맞지 않는다.**
+#:
+#: 재사용은 **개념이 반복될 때** 의미가 있다 — 차단·검사·통과·승인 관문처럼 여러 편에
+#: 걸쳐 같은 개념이 나온다. 포즈는 매 편 상황이 달라서 애초에 재사용 대상이 아니다.
+#:
+#: 파일은 라이브러리에 **남기되 조회에서 제외**한다. 상황 씬으로 대체되면 지운다.
+RETIRED_CONCEPTS = {
+    "explain": ["설명", "설명하기", "안내", "말하기", "explain", "presenting"],
+    "point": ["가리키기", "가리킴", "지목", "시선", "point", "pointing"],
+    "surprise": ["놀람", "놀라기", "충격", "의외", "surprise", "shocked"],
+    "arms": ["팔짱", "단호", "경고", "arms-crossed", "firm"],
+    "tilt": ["갸웃", "의문", "헷갈림", "tilt", "puzzled"],
 }
 
 
@@ -183,6 +201,17 @@ def _concept_key(concept, table=None):
     return None
 
 
+def _retired_key(concept):
+    """사용 보류된 포즈 개념이면 그 키를 돌려준다. 아니면 None."""
+    c = (concept or "").strip().lower()
+    if c in RETIRED_CONCEPTS:
+        return c
+    for key, words in RETIRED_CONCEPTS.items():
+        if any(w in c for w in words):
+            return key
+    return None
+
+
 def find_scene(subject, concept):
     """라이브러리에서 먼저 찾는다. 없으면 None — **생성하지 않는다.**"""
     ch = bucket(subject)
@@ -228,6 +257,15 @@ def get_scene(subject, concept, motif=None, ratio="1:1", place=None, staging=Non
     # 파일을 만들었다. 그런데 `_load_index` 의 정규식은 `[a-z0-9\-]` 만 받는다 —
     # 한글 파일명은 색인에 **영원히 안 잡힌다.** 저장은 되는데 조회가 안 되니
     # 다음 편이 같은 씬을 또 생성한다. 조용히 새는 크레딧이라 여기서 끊는다.
+    retired = _retired_key(concept)
+    if retired:
+        raise ValueError(
+            f"'{concept}' 는 **포즈** 개념이라 사용 보류다 (RETIRED_CONCEPTS: {retired}). "
+            f"등재 단위는 포즈가 아니라 **상황**이다 — 카드 본문이 말하는 장면을 개념명으로 "
+            f"잡아라 (login-and-work · shared-computer · two-tests 처럼). "
+            f"포즈로 만들면 어느 카드에나 맞지만 어느 카드에도 딱 맞지 않는 그림이 나온다."
+        )
+
     key = _concept_key(concept)
     if not key:
         raise ValueError(
