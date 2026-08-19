@@ -182,69 +182,198 @@ def pick_character(subject):
     return None
 
 
-#: 씬이 놓이는 공간. **스튜디오가 아니라 실제 장소**를 그린다.
-#: 씬마다 다르게 할 필요는 없다 — 상황에 맞으면 같은 편 안에서 반복돼도 좋고,
-#: 오히려 같은 사무실이 이어지면 이야기가 이어진다. 상황이 사무실이 아닐 때만
-#: `illust_prompt(..., place=...)` 로 바꾼다 (서버룸·회의실·집 작업실 등).
-DEFAULT_PLACE = ("a quiet modern office corner with a desk, low shelves and a plant, "
-                 "daylight coming from a window to one side")
+# ── 일러스트 프롬프트 빌더 — 3층 (2026-08-19 JJ 확정 «씬 연출 시스템 전면 개정») ────
+#
+# 계기: 전 씬이 같은 사무실·같은 책상 소품·같은 «따뜻한 낮» 으로 나왔다. 아래 DEFAULT_PLACE
+# 와 옛 _STYLE_HEAD 의 "Warm natural daylight" 가 **상수**로 박혀 있어 소재가 바뀌어도 무대·소품
+# 어휘·감정 톤이 매번 같았다 — 「소품 씬은 실제 공간 필수」 규칙의 *예시 문장 하나*가 유일한
+# 무대로 굳은 것이 기원이다. 레퍼런스 채널은 같은 마스코트로 동굴·서재·격납고를 오간다.
+#
+# 그래서 셋으로 가른다.
+#   상수 층 — 브랜드 고정 5개. **이것 외는 전부 변수다.**
+#     ① 클레이 3D 렌더 질감            _CONST_TEXTURE
+#     ② 캐릭터 생김새(Element+상용구)   CHARACTERS[*].look — 연출과 완전 분리, 무대가 바뀌어도 불변
+#     ③ 글자·숫자·라벨 금지            _NO_TEXT
+#     ④ 실제 공간                       _CONST_REAL_PLACE — «실재성» 규칙이지 «단일 무대» 규칙이 아니다
+#     ⑤ 구도 규격                       _FRAMING (4:5 표지 하단 1/3 여백 / 1:1 주체 크기)
+#   연출 층 — 씬별 변수 `Staging` 5요소: location · props · action · mood · format.
+#   호출 층 — 편의 gen_scenes.py 가 소재에서 5요소를 정한다.
+#
+# 규칙(SKILL §6.8 v3.18): 「씬은 소재를 연기한다 — 공간·소품·행동·빛이 전부 소재에서 나온다.
+# 에피소드마다 무대가 달라야 하고, 브랜드 상수 5개는 모든 변주 위에 유지」.
 
-#: 스타일 고정부. `{place}` 만 호출부가 바꾼다.
-#:
-#: 종전 고정부는 "Clean light gray studio backdrop … teal and white accents" 였다.
-#: 두 가지가 문제였다 — ① 모든 씬이 같은 회색 스튜디오에 떠 있어 상황이 안 읽혔고,
-#: ② `teal accents` 지시가 배경에 **정체불명 청록 도형**으로 나타났다(그로키 씬들
-#: 좌상단·우하단에 실제로 떴다). 브랜드 색은 소품에만 들어가야 한다.
-_STYLE_HEAD = (
-    "Soft matte 3D render, Pixar-like clay toy aesthetic. "
-    "Set in a real place, not a studio: {place}. "
-    "Shallow depth of field — the room falls softly out of focus behind the subject, "
-    "which stays crisp and clearly separated from it. Warm natural daylight. "
-    "Teal appears only on physical props in the scene such as a chair, a laptop or a cable, "
-    "never as floating shapes, gradients or graphic panels in the background. "
-)
+_CONST_TEXTURE = "Soft matte 3D render, Pixar-like clay toy aesthetic."
 
-#: 화면비별 구도 지시. 본문 카드는 1:1(상단 밴드에 덮기), 표지는 4:5 상단 2/3 구도다
-#: (SKILL §6). 이 문구를 손으로 고쳐 쓰지 말 것 — 프롬프트를 새로 쓰면 톤이 갈린다.
+# ④ 실재성 — 공중부양·무배경 금지. 어떤 공간이든 되지만 «어딘가»여야 한다.
+_CONST_REAL_PLACE = ("Set in a real, physical place with a floor, walls and depth — nothing floats, "
+                     "no blank studio backdrop, no abstract gradient background. Shallow depth of field: "
+                     "the place falls softly out of focus behind the subject, which stays crisp.")
+
+# 브랜드 색 규칙 — 소품 층에 붙는 상수 문장. teal 은 **물리 소품에만**(그로키 씬 배경에 청록 도형이
+# 떴던 사고). 연출 층이 아니라 상수 층에 둔다: 무드가 어떻든 이 문장은 남는다.
+_CONST_TEAL = ("Teal appears only on physical props in the scene, never as floating shapes, "
+               "gradients or graphic panels in the background.")
+
+#: 화면비별 구도 지시(상수 ⑤). 4:5 표지는 헤드라인이 얹히는 하단 1/3 을 비운다.
+#: 종전엔 «brightly lit floor» 로 밝기를 못박았는데, 무드가 변수가 되면서 다크 표지가 가능해졌다 —
+#: template._scheme 은 luma>140 이면 잉크, 아니면 흰 글씨를 고르므로 **밝든 어둡든 확실하기만**
+#: 하면 된다. 위험한 것은 임계선 근처 회색이다(실측 109·125·138 흔들림). 그래서 «중간 회색 금지».
 _FRAMING = {
     "1:1": "Square 1:1, the subject large in frame with calm space around it. ",
-    # 표지는 **글자가 그림 위에 얹히는 유일한 카드**다. `template._scheme` 이 이 구역
-    # 밝기로 잉크/흰 글씨를 고르는데, 배경이 실제 공간이 되면서 그 밝기가 임계선
-    # (brand.LUMA_THRESHOLD=140) 근처로 내려왔다 — 실측 109·125·138 로 색이 흔들렸다.
-    # "calm / low-contrast" 는 **어두워도 만족된다.** 그래서 밝기를 명시한다.
-    "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds; "
-            "the lower third is a plain, brightly lit, unobstructed floor — "
-            "no furniture, no cables and no strong shadows crossing it. "),
+    "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds; the lower third is a plain, "
+            "unobstructed floor with even lighting — either clearly bright or clearly dark, never a muddy "
+            "mid-grey — with no furniture, no cables and no strong shadows crossing it. "),
 }
 
 _NO_TEXT = "Absolutely no text, no letters, no numbers, no labels."
 
-#: 기존 호출부 호환 — 1:1 고정부 전문(기본 공간 적용).
-ILLUST_STYLE = _STYLE_HEAD.format(place=DEFAULT_PLACE) + _FRAMING["1:1"] + _NO_TEXT
+#: 연출 포맷 — 표지·씬의 «시각 포맷 자체»도 소재에서 고른다 (v2 델타 2-1 ⑤).
+#: 캐릭터는 기본값이 아니라 연출 선택지다 — 담당 캐릭터가 있어도 실물형이 소재를 더 잘 말하면 실물형.
+#: 채널 통일성은 하단 화이트 블록·뱃지·로고가 담당하고 상단 포맷은 자유다.
+FORMATS = {
+    "product":   "실물형 — 제품 로고·공식 화면·발표 자료 캡처 중심. **이 빌더가 만들지 않는다**(캡처·코드 합성 경로, 로고는 §6 실물 합성만). 제품 출시·기업 소식에 우선.",
+    "character": "캐릭터 연기형 — 마스코트가 소재를 연기. 연기할 «상황»이 있을 때만. action 필수.",
+    "situation": "상황 일러스트형 — 무캐릭터 소품·장면(ep20 방식). 로스터 밖 주체·회사 소식.",
+    "photo":     "실사형 — 행사·인물·실물 제품(출처 표기 §5). **이 빌더가 만들지 않는다.**",
+}
+_GENERATIVE = ("character", "situation")
 
 
-def illust_prompt(subject, motif, ratio="1:1", place=None):
-    """일러스트 생성 프롬프트를 만든다.
+class Staging:
+    """연출 층 5요소. 전부 영문 구절(문장 조각)로 적는다 — 빌더가 이어 붙인다.
 
-    subject = 소식 주체("Anthropic" 등) → 캐릭터 자동 배정
-    motif   = 뉴스 내용을 은유하는 소품/동작 (영문 1~2문장)
-    ratio   = "1:1"(본문 카드 기본) 또는 "4:5"(표지 — 상단 2/3 구도)
-    place   = 씬이 놓이는 실제 공간. 생략하면 `DEFAULT_PLACE`(사무실 한켠).
-              **씬마다 바꿀 필요는 없다** — 상황이 사무실이 아닐 때만 바꾼다.
+    location  공간. **소재에서 파생**, 에피소드마다 다르게. 같은 편 안에서는 표지·본문이 같은 무대 계열.
+    props     소품 세트. 공간에 어울리는 소도구 — 책상 위 물건으로 한정하지 않는다(사다리·기계·간판·선반·바닥 물건).
+    action    캐릭터 행동. **소재를 연기하는 동작**(들기·조작·살피기·기대기…). 정면 차렷은 기본값이 아니다.
+              format="situation" 이면 «장면에서 벌어지는 일»을 적는다(캐릭터 없이).
+    mood      감정 온도 + 조명 + 색온도. 전부 개방 — 다크+국부광(랜턴·모니터광·스포트라이트), 긴장·미스터리·
+              코믹·드라마·차분. «따뜻한 낮»은 선택지 중 하나일 뿐 기본값이 아니다.
+    format    FORMATS 키. 생성 대상은 character / situation 뿐.
+    """
 
-    no-text 조항은 고정부라 호출부가 빼먹을 수 없다 — 카드의 글자는 전부
-    card.py 가 렌더한다는 것이 이 파이프라인의 전제다.
+    __slots__ = ("location", "props", "action", "mood", "format")
+
+    def __init__(self, location, props, action, mood, format="character"):
+        if format not in FORMATS:
+            raise ValueError(f"모르는 format: {format!r} (쓸 수 있는 값: {sorted(FORMATS)})")
+        for k, v in (("location", location), ("props", props), ("mood", mood)):
+            if not (v or "").strip():
+                raise ValueError(f"Staging.{k} 가 비었다 — 연출 층은 빈 채로 두지 않는다(그러면 옛 기본값으로 돌아간다).")
+        if format == "character" and not (action or "").strip():
+            raise ValueError("format='character' 인데 action 이 없다 — 연기할 상황이 없으면 situation 으로 가라.")
+        self.location, self.props, self.action, self.mood, self.format = location, props, action or "", mood, format
+
+    def as_dict(self):
+        return {k: getattr(self, k) for k in self.__slots__}
+
+
+def illust_prompt(subject, motif=None, ratio="1:1", place=None, staging=None, character=None):
+    """일러스트 생성 프롬프트.
+
+    **새 경로 (2026-08-19~)**: `staging=Staging(...)` 을 준다. 문장 순서 —
+        [캐릭터 Element+상용구 —] action. Location. Props + teal 규칙. Mood. 텍스처 · 실재성 · 구도 · no-text
+    subject 로 캐릭터를 고르되(`pick_character`), `character=` 로 명시할 수도 있다.
+    format="situation" 이면 캐릭터를 세우지 않는다 — 담당 캐릭터가 있어도.
+
+    **옛 경로 (호환)**: `motif=` 문자열 + `place=`. 사무실·따뜻한 낮 기본값으로 굽는다.
+    기존 편(ep14~16·씨댄스·울트라패스트) 빌드가 그대로 돌게 남겨 둔 것이고 **새 편은 쓰지 않는다** —
+    staging 없이 부르면 stderr 에 한 줄 경고를 찍는다(조용히 옛 무대로 돌아가지 않게).
     """
     if ratio not in _FRAMING:
         raise ValueError(f"모르는 화면비다: {ratio!r} (쓸 수 있는 값: {sorted(_FRAMING)})")
-    ch = pick_character(subject)
-    if ch:
+
+    if staging is None:
+        # ── 옛 경로 ──
+        if motif is None:
+            raise ValueError("motif 도 staging 도 없다 — 무엇을 그릴지 정하지 않았다.")
+        import sys as _sys
+        # ASCII 로 찍는다 — PS 5.1 콘솔(cp949)에서 한글 경고가 깨져 «경고가 있었는지»조차 안 읽힌다.
+        print("[card.illust_prompt] WARNING: called without staging -> legacy fixed stage "
+              "(office, warm daylight). New episodes must pass Staging (SKILL 6.8 v3.18).", file=_sys.stderr)
+        ch = character or pick_character(subject)
+        head = f"<<<{CHARACTERS[ch]['element']}>>> {CHARACTERS[ch]['look']} — {motif}" if ch else motif
+        legacy_style = (f"{_CONST_TEXTURE} Set in a real place, not a studio: {place or DEFAULT_PLACE}. "
+                        "Shallow depth of field — the room falls softly out of focus behind the subject, "
+                        f"which stays crisp and clearly separated from it. Warm natural daylight. {_CONST_TEAL} ")
+        return f"{head} {legacy_style}{_FRAMING[ratio]}{_NO_TEXT}"
+
+    st = staging if isinstance(staging, Staging) else Staging(**staging)
+    if st.format not in _GENERATIVE:
+        raise ValueError(f"format={st.format!r} 은 생성 대상이 아니다 — 캡처·코드 합성 경로로 간다 (FORMATS 참조).")
+    parts = []
+    if st.format == "character":
+        ch = character or pick_character(subject)
+        if not ch:
+            raise ValueError(f"주체 {subject!r} 에 담당 캐릭터가 없다 — format='situation' 으로 가라(§2 로스터 밖 주체).")
         c = CHARACTERS[ch]
-        head = f"<<<{c['element']}>>> {c['look']} — {motif}"
+        parts.append(f"<<<{c['element']}>>> {c['look']} — {st.action.rstrip('.')}.")
     else:
-        head = motif
-    style = _STYLE_HEAD.format(place=place or DEFAULT_PLACE)
-    return f"{head} {style}{_FRAMING[ratio]}{_NO_TEXT}"
+        if st.action:
+            parts.append(st.action.rstrip('.') + ". No characters, no people, no mascots.")
+        else:
+            parts.append("No characters, no people, no mascots.")
+    parts.append("Location: " + st.location.rstrip('.') + ".")
+    parts.append("Props: " + st.props.rstrip('.') + ". " + _CONST_TEAL)
+    parts.append("Mood and light: " + st.mood.rstrip('.') + ".")
+    parts.append(f"{_CONST_TEXTURE} {_CONST_REAL_PLACE} {_FRAMING[ratio]}{_NO_TEXT}")
+    return " ".join(parts)
+
+
+#: 옛 호출부 호환 상수 (사무실 기본 무대). 새 코드는 쓰지 않는다.
+DEFAULT_PLACE = ("a quiet modern office corner with a desk, low shelves and a plant, "
+                 "daylight coming from a window to one side")
+ILLUST_STYLE = (f"{_CONST_TEXTURE} Set in a real place, not a studio: {DEFAULT_PLACE}. "
+                "Shallow depth of field — the room falls softly out of focus behind the subject, "
+                f"which stays crisp and clearly separated from it. Warm natural daylight. {_CONST_TEAL} "
+                + _FRAMING["1:1"] + _NO_TEXT)
+
+
+# ── 검수 가드 — 무드 조명 아래 캐릭터 색 식별 (2026-08-19 신설) ─────────────────────
+# 다크 씬이 허용되면서 «캐릭터가 어둠에 묻히는» 실패가 새로 생긴다. 생성물에서 캐릭터의
+# 서명색(클로디 코랄·큐 인디고·코디 하늘색 …)이 실제로 보이는 픽셀 비율을 잰다.
+# 휴리스틱이다 — 통과가 «좋다»는 뜻은 아니고, 실패는 «캐릭터가 안 읽힌다»는 강한 신호다.
+# 크림(그로키·마누·지피)은 흰 벽과 갈려 서명색이 약하다 → «밝은 저채도 픽셀» 비율만 본다(약한 검사).
+#: 캐릭터 → [(H범위 0~360, S최소, V최소), ...] 어느 하나라도 만족하면 그 픽셀은 «캐릭터색»
+COLOR_SIGNATURE = {
+    "claudie": [((2, 28), 0.45, 0.45)],            # 코랄 #F07050
+    "kyu":     [((215, 260), 0.35, 0.25)],          # 인디고 패널
+    "codie":   [((185, 215), 0.30, 0.55)],          # 하늘색 플러시
+    "gpty":    [((0, 360), 0.00, 0.80)],            # 흰 펠트 — 약한 검사
+    "manu":    [((0, 360), 0.00, 0.80)],            # 크림 — 약한 검사
+    "groki":   [((0, 360), 0.00, 0.80)],            # 크림 — 약한 검사
+}
+COLOR_MIN_FRACTION = 0.012   # 이미지의 1.2% 이상 — 1:1 1024² 기준 약 12,600px (얼굴 하나 크기)
+
+
+def character_color_fraction(path, ch):
+    """이미지에서 캐릭터 서명색 픽셀 비율(0~1). 캐릭터 키를 모르면 None."""
+    import colorsys
+    sig = COLOR_SIGNATURE.get(ch)
+    if not sig:
+        return None
+    im = Image.open(path).convert("RGB")
+    im.thumbnail((256, 256))
+    px = list(im.getdata())
+    hit = 0
+    for r, g, b in px:
+        h, s_, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        hd = h * 360
+        for (h0, h1), smin, vmin in sig:
+            if h0 <= hd <= h1 and s_ >= smin and v >= vmin:
+                hit += 1
+                break
+    return hit / max(1, len(px))
+
+
+def assert_character_visible(path, ch, min_fraction=COLOR_MIN_FRACTION):
+    """검수 가드: 무드 조명 아래서도 캐릭터 색이 식별되는가. 미달이면 AssertionError."""
+    f = character_color_fraction(path, ch)
+    if f is None:
+        return None
+    if f < min_fraction:
+        raise AssertionError(f"{os.path.basename(path)}: {ch} 서명색 픽셀 {f:.2%} < {min_fraction:.1%} — "
+                             "무드 조명에 캐릭터가 묻혔다. 국부광을 캐릭터에 주거나 노출을 올려 재생성.")
+    return f
 
 
 # ── 렌더 헬퍼 ────────────────────────────────────────────────────────
