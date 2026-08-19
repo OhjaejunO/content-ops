@@ -108,7 +108,9 @@ CHARACTERS = {
     "kyu": {
         "name": "큐",
         "element": "15aa79c0-6798-4ba3-b380-f0fbb2d700a6",
-        "owns": "Qwen / 알리바바",
+        # 2026-08-19 JJ 정정: 큐는 **Qwen(모델) 명시 소재 전용**이다. 알리바바의 다른 제품·회사 소식
+        # (HappyShrimp 음악 모델 등)은 로스터 밖 → 캐릭터 없이 소품·상황 일러스트(props). 회사≠모델.
+        "owns": "Qwen (모델 명시 소재만 — 알리바바 회사 소식은 무캐릭터)",
         "look": ("Kyu, a felt hexagonal star plush in white and indigo interlocking "
                  "panels with a triangular belly patch"),
     },
@@ -162,7 +164,9 @@ _SUBJECT_MAP = [
     (("anthropic", "claude", "클로드", "앤트로픽"), "claudie"),
     (("codex", "코덱스"), "codie"),
     (("openai", "chatgpt", "gpt", "오픈ai", "챗gpt"), "gpty"),
-    (("qwen", "alibaba", "큐원", "알리바바"), "kyu"),
+    # 회사≠모델 (2026-08-19 JJ 정정): «alibaba/알리바바» 는 매핑하지 않는다 — 큐는 Qwen 소재만.
+    # ep20 에서 HappyShrimp(알리바바 음악 모델)가 «Alibaba» 주체로 큐에 걸렸던 것이 계기다.
+    (("qwen", "큐원"), "kyu"),
     (("manus", "마누스"), "manu"),
     (("grok", "그록", "xai", "spacexai", "엑스ai"), "groki"),
 ]
@@ -174,6 +178,8 @@ def pick_character(subject):
     Codex 는 OpenAI 산하지만 **코디가 따로 있다** — 더 좁은 매칭이 이긴다.
     그래서 _SUBJECT_MAP 에서 codex 를 openai 보다 먼저 본다.
     아는 주체가 없으면 None — 그 소식은 캐릭터 없이 소품만으로 간다(SKILL §2).
+    **회사와 모델은 다르다** — 큐는 Qwen 소재에만 걸리고 «Alibaba» 만으로는 걸리지 않는다
+    (2026-08-19). 같은 원리로 다른 캐릭터도 담당 «제품/모델» 이름이 주체에 있어야 한다.
     """
     s = (subject or "").lower()
     for keys, ch in _SUBJECT_MAP:
