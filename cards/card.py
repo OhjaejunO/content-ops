@@ -220,8 +220,21 @@ _CONST_REAL_PLACE = ("Set in a real, physical place with a floor, walls and dept
 
 # 브랜드 색 규칙 — 소품 층에 붙는 상수 문장. teal 은 **물리 소품에만**(그로키 씬 배경에 청록 도형이
 # 떴던 사고). 연출 층이 아니라 상수 층에 둔다: 무드가 어떻든 이 문장은 남는다.
-_CONST_TEAL = ("Teal appears only on physical props in the scene, never as floating shapes, "
-               "gradients or graphic panels in the background.")
+#
+# 🔴 2026-08-21 개정 — 종전 문구 «Teal appears only on physical props» 가 **지시로 읽혔다.**
+# 「teal 이 나온다면 소품에만」이 의도인데 모델은 「소품을 teal 로 칠하라」로 받았다.
+# ep25 에서 **두 번** 났다: 빈 쪽지가 teal 로 → 색을 명시해 고쳤더니 이번엔 노트북이 teal 로.
+# **대상만 옮겨 다녔다.**
+#
+# 왜 지금까지 안 났나 — 라이브러리 7종은 전부 색을 명시했다(「민트 컨베이어」·「크림·초록·청회색
+# 태그」). teal 비중 실측 0.8~8.1% 로 전부 정상이다. **색을 안 적은 주인공이 있을 때만** 이
+# 문장이 그 빈자리를 채운다.
+#
+# 그래서 금지만 더하지 않고 **빈자리를 다른 규칙으로 메운다** — 마지막 문장(주인공은 제 재질색을
+# 지킨다)이 핵심이다. 금지만 하면 빈자리가 남고, 빈자리는 또 채워진다.
+_CONST_TEAL = ("Teal is optional and must never dominate. If teal appears at all, only on small "
+               "secondary props in the background. Never colour the main subject teal — main "
+               "subjects keep their natural material colour.")
 
 #: 화면비별 구도 지시(상수 ⑤). 4:5 표지는 헤드라인이 얹히는 하단 1/3 을 비운다.
 #: 종전엔 «brightly lit floor» 로 밝기를 못박았는데, 무드가 변수가 되면서 다크 표지가 가능해졌다 —
