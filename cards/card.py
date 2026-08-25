@@ -274,6 +274,15 @@ def logo_reference(name):
     p = os.path.join(LOGO_DIR, f"{name}.png")
     if not os.path.exists(p):
         raise FileNotFoundError(f"로고 원본이 없다: {p} — 공식 소스에서 받아 assets/logos/ 에 두고 README.md 에 출처 URL 을 적어라")
+    # 2026-08-25 (SKILL v3.51): «존재»가 아니라 «디코드»로 판정한다. 2026-08-22 GitHub `Octocat.png` URL 이 404 인데
+    # HTML 본문 128,658 B 가 .png 로 저장돼 정상 PNG(7,249 B)보다 17배 컸다 — 크기·확장자·HTTP 코드로는 안 갈린다.
+    # 여기가 참조를 얻는 유일한 경로라 이 가드 하나로 깨진 참조를 손에 쥘 방법이 없어진다(정관 §0 4층 ①).
+    from PIL import UnidentifiedImageError
+    try:
+        with Image.open(p) as im:
+            im.verify()                 # 헤더까지 실제로 읽는다
+    except (UnidentifiedImageError, OSError) as e:
+        raise ValueError(f"참조 이미지가 아니다: {p} — {e}. 404 HTML 본문이 .png 로 저장된 경우가 실제로 있었다(2026-08-22)")
     return p
 
 
