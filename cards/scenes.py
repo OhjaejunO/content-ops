@@ -117,6 +117,12 @@ CONCEPTS = {
     # 잡히는 쪽이라 그대로 뒀으면 카드에 다른 그림이 실렸을 것이다.
     "same-thing-three-labels": ["말이 다름", "표기가 갈림", "같은 것 다른 이름",
                                 "제각각", "저마다 다르게", "different-labels"],
+    # ep32 (2026-08-26) — 두 자리(챗·Cowork)가 같은 수첩(메모리)을 쓴다
+    # ep33 (2026-08-26) — 무료 차로가 열려 더 많은 것을 들고 지나간다(무료로 되는 것 모음)
+    "free-lane-more-items": ["무료 개방", "무료로 되는 것", "무료 차로", "무료 확대", "free", "free-lane", "free-lane-more-items"],
+    "one-notebook-two-desks": ["기억 공유", "메모리 공유", "같은 수첩", "두 자리 한 기억", "하나의 메모리", "memory", "shared-memory", "one-notebook-two-desks"],
+    # ep34 (2026-08-26) — 다음 세대 설계도를 먼저 펼쳐 보인다(Qwen4 구조 미리보기 오픈 웨이트)
+    "blueprint-unroll": ["설계도 공개", "구조 미리보기", "청사진", "차세대 구조", "선행 공개", "blueprint", "architecture-preview", "blueprint-unroll"],
     "three-labels-laid-out": ["나란히 놓기", "펼쳐 놓기", "층별 정리", "대조표",
                               "견주기", "laid-out", "side-by-side"],
 }
