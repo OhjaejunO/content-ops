@@ -199,24 +199,37 @@ def pick_character(subject):
 # 무대로 굳은 것이 기원이다. 레퍼런스 채널은 같은 마스코트로 동굴·서재·격납고를 오간다.
 #
 # 그래서 셋으로 가른다.
-#   상수 층 — 브랜드 고정 5개. **이것 외는 전부 변수다.**
-#     ① 클레이 3D 렌더 질감            _CONST_TEXTURE
-#     ② 캐릭터 생김새(Element+상용구)   CHARACTERS[*].look — 연출과 완전 분리, 무대가 바뀌어도 불변
-#     ③ 글자·숫자·라벨 금지            _NO_TEXT
-#     ④ 실제 공간                       _CONST_REAL_PLACE — «실재성» 규칙이지 «단일 무대» 규칙이 아니다
-#     ⑤ 구도 규격                       _FRAMING (4:5 표지 하단 1/3 여백 / 1:1 주체 크기)
-#   연출 층 — 씬별 변수 `Staging` 5요소: location · props · action · mood · format.
+#   상수 층 — 브랜드 고정 3개. **이것 외는 전부 변수다.**
+#     ① 캐릭터 생김새(Element+상용구)   CHARACTERS[*].look — 연출과 완전 분리, 무대가 바뀌어도 불변
+#     ② 글자·숫자·라벨 금지            _NO_TEXT
+#     ③ 구도 규격                       _FRAMING (4:5 표지 하단 1/3 저밀도 / 1:1 주체 크기)
+#   연출 층 — 씬별 변수 `Staging` 7요소: location · props · action · mood · style · subject_cue · format.
+#
+# 🔴 2026-08-28 개정 — **질감·실재성이 상수에서 내려왔다** (JJ 지시 4).
+#   종전 상수 둘(«Soft matte 3D render, Pixar-like clay toy aesthetic» + «실제 공간·얕은 심도»)이
+#   **모든 편을 사진 톤 클레이 렌더로 굳혔다.** 만화·일러스트·추상·평면 도해가 소재에 더 맞는 편에서도
+#   프롬프트가 매번 그 두 문장과 싸워야 했다 — ③(교정) 자리에 있던 문제를 ①(구조)로 내린다.
+#   지금 남은 구도 제약은 **4:5 · 하단 1/3 저밀도** 뿐이고, 그 둘은 헤드라인이 얹히는 자리라 규격이다.
 #   호출 층 — 편의 gen_scenes.py 가 소재에서 5요소를 정한다.
 #
 # 규칙(SKILL §6.8 v3.18): 「씬은 소재를 연기한다 — 공간·소품·행동·빛이 전부 소재에서 나온다.
 # 에피소드마다 무대가 달라야 하고, 브랜드 상수 5개는 모든 변주 위에 유지」.
 
-_CONST_TEXTURE = "Soft matte 3D render, Pixar-like clay toy aesthetic."
-
-# ④ 실재성 — 공중부양·무배경 금지. 어떤 공간이든 되지만 «어딘가»여야 한다.
-_CONST_REAL_PLACE = ("Set in a real, physical place with a floor, walls and depth — nothing floats, "
-                     "no blank studio backdrop, no abstract gradient background. Shallow depth of field: "
-                     "the place falls softly out of focus behind the subject, which stays crisp.")
+#: 스타일 프리셋 — **상수가 아니라 선택지**다. `Staging.style` 에 키를 주거나 영문 구절을 직접 쓴다.
+#: 옛 상수 둘은 `clay` 하나로 합쳐 남겼다 — 지우면 옛 편을 다시 굽지 못한다.
+STYLE_PRESETS = {
+    "clay": ("Soft matte 3D render, Pixar-like clay toy aesthetic. Set in a real, physical place with a "
+             "floor, walls and depth — nothing floats, no blank studio backdrop. Shallow depth of field: "
+             "the place falls softly out of focus behind the subject, which stays crisp."),
+    "cartoon": ("Flat 2D cartoon illustration with bold clean outlines and simple cel shading, "
+                "limited palette, comic-panel energy."),
+    "illustration": ("Hand-drawn editorial illustration, textured paper grain, loose confident linework, "
+                     "washed gouache colour."),
+    "abstract": ("Abstract geometric composition — simple shapes, large flat colour fields and negative "
+                 "space carry the idea; no attempt at physical realism."),
+    "physical": ("Tangible physical objects photographed on a plain surface, natural light, honest "
+                 "everyday materials — no gloss, no studio staging."),
+}
 
 # 브랜드 색 규칙 — 소품 층에 붙는 상수 문장. teal 은 **물리 소품에만**(그로키 씬 배경에 청록 도형이
 # 떴던 사고). 연출 층이 아니라 상수 층에 둔다: 무드가 어떻든 이 문장은 남는다.
@@ -243,8 +256,8 @@ _CONST_TEAL = ("Teal is optional and must never dominate. If teal appears at all
 _FRAMING = {
     "1:1": "Square 1:1, the subject large in frame with calm space around it. ",
     "4:5": ("Vertical 4:5 composition, subject held in the upper two thirds; the lower third is a plain, "
-            "unobstructed floor with even lighting — either clearly bright or clearly dark, never a muddy "
-            "mid-grey — with no furniture, no cables and no strong shadows crossing it. "),
+            "low-detail area of even tone — either clearly bright or clearly dark, never a muddy mid-grey — "
+            "with nothing crossing it and no strong shadows or edges in it. "),
 }
 
 _NO_TEXT = "Absolutely no text, no letters, no numbers, no labels."
@@ -295,20 +308,31 @@ class Staging:
               format="situation" 이면 «장면에서 벌어지는 일»을 적는다(캐릭터 없이).
     mood      감정 온도 + 조명 + 색온도. 전부 개방 — 다크+국부광(랜턴·모니터광·스포트라이트), 긴장·미스터리·
               코믹·드라마·차분. «따뜻한 낮»은 선택지 중 하나일 뿐 기본값이 아니다.
+    style     🔴 **필수 (2026-08-28)**. 그림체·질감·공간감. `STYLE_PRESETS` 키(clay·cartoon·illustration·
+              abstract·physical) 또는 영문 구절 직접. **빈 값을 허용하지 않는다** — 허용하면 옛 클레이
+              고정으로 조용히 돌아가고, 그것이 이 개정이 없앤 바로 그 상태다.
+    subject_cue
+              표지에서 **무슨 소재인지 읽히게 하는 단서**. 브랜드의 형태·색·상징을 장면 속 캐릭터나
+              사물로 **재해석**해 적는다 — 공식 로고 파일을 붙이지 않는다(그건 format="logo" 경로다).
+              예: 「네 갈래 별을 통통한 캐릭터로」·「해바라기와 물감 견본」·「Z 모양으로 접힌 판」.
+              🔴 판정 기준은 **로고 유사도가 아니라 «무슨 소재인가»가 읽히는가**다.
+              §6.6 — 상표를 그대로 재현하지 않는다. 재해석임이 눈에 보여야 한다.
     format    FORMATS 키. 생성 대상은 character / situation 뿐.
     """
 
-    __slots__ = ("location", "props", "action", "mood", "format")
+    __slots__ = ("location", "props", "action", "mood", "style", "subject_cue", "format")
 
-    def __init__(self, location, props, action, mood, format="character"):
+    def __init__(self, location, props, action, mood, style, subject_cue="", format="character"):
         if format not in FORMATS:
             raise ValueError(f"모르는 format: {format!r} (쓸 수 있는 값: {sorted(FORMATS)})")
-        for k, v in (("location", location), ("props", props), ("mood", mood)):
+        for k, v in (("location", location), ("props", props), ("mood", mood), ("style", style)):
             if not (v or "").strip():
                 raise ValueError(f"Staging.{k} 가 비었다 — 연출 층은 빈 채로 두지 않는다(그러면 옛 기본값으로 돌아간다).")
+        style = STYLE_PRESETS.get(style.strip(), style)
         if format == "character" and not (action or "").strip():
             raise ValueError("format='character' 인데 action 이 없다 — 연기할 상황이 없으면 situation 으로 가라.")
-        self.location, self.props, self.action, self.mood, self.format = location, props, action or "", mood, format
+        self.location, self.props, self.action, self.mood = location, props, action or "", mood
+        self.style, self.subject_cue, self.format = style, subject_cue or "", format
 
     def as_dict(self):
         return {k: getattr(self, k) for k in self.__slots__}
@@ -339,7 +363,7 @@ def illust_prompt(subject, motif=None, ratio="1:1", place=None, staging=None, ch
               "(office, warm daylight). New episodes must pass Staging (SKILL 6.8 v3.18).", file=_sys.stderr)
         ch = character or pick_character(subject)
         head = f"<<<{CHARACTERS[ch]['element']}>>> {CHARACTERS[ch]['look']} — {motif}" if ch else motif
-        legacy_style = (f"{_CONST_TEXTURE} Set in a real place, not a studio: {place or DEFAULT_PLACE}. "
+        legacy_style = (f"{STYLE_PRESETS['clay']} Set in a real place, not a studio: {place or DEFAULT_PLACE}. "
                         "Shallow depth of field — the room falls softly out of focus behind the subject, "
                         f"which stays crisp and clearly separated from it. Warm natural daylight. {_CONST_TEAL} ")
         return f"{head} {legacy_style}{_FRAMING[ratio]}{_NO_TEXT}"
@@ -365,17 +389,22 @@ def illust_prompt(subject, motif=None, ratio="1:1", place=None, staging=None, ch
             parts.append(st.action.rstrip('.') + ". No characters, no people, no mascots.")
         else:
             parts.append("No characters, no people, no mascots.")
+    if st.subject_cue:
+        # 소재 단서는 **행동 바로 뒤**에 둔다 — 뒤로 밀면 배경 설명에 묻힌다(ep36 표지 실측).
+        parts.append("Subject cue: " + st.subject_cue.rstrip('.') + ". This is a free reinterpretation "
+                     "of the brand's form and colour as an object or character in the scene — do not "
+                     "reproduce the official logo, wordmark or trademark, and do not draw any lettering.")
     parts.append("Location: " + st.location.rstrip('.') + ".")
     parts.append("Props: " + st.props.rstrip('.') + ". " + _CONST_TEAL)
     parts.append("Mood and light: " + st.mood.rstrip('.') + ".")
-    parts.append(f"{_CONST_TEXTURE} {_CONST_REAL_PLACE} {_FRAMING[ratio]}{_NO_TEXT}")
+    parts.append(f"{st.style.rstrip('.')}. {_FRAMING[ratio]}{_NO_TEXT}")
     return " ".join(parts)
 
 
 #: 옛 호출부 호환 상수 (사무실 기본 무대). 새 코드는 쓰지 않는다.
 DEFAULT_PLACE = ("a quiet modern office corner with a desk, low shelves and a plant, "
                  "daylight coming from a window to one side")
-ILLUST_STYLE = (f"{_CONST_TEXTURE} Set in a real place, not a studio: {DEFAULT_PLACE}. "
+ILLUST_STYLE = (f"{STYLE_PRESETS['clay']} Set in a real place, not a studio: {DEFAULT_PLACE}. "
                 "Shallow depth of field — the room falls softly out of focus behind the subject, "
                 f"which stays crisp and clearly separated from it. Warm natural daylight. {_CONST_TEAL} "
                 + _FRAMING["1:1"] + _NO_TEXT)
