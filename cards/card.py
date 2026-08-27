@@ -169,6 +169,9 @@ _SUBJECT_MAP = [
     (("qwen", "큐원"), "kyu"),
     (("manus", "마누스"), "manu"),
     (("grok", "그록", "xai", "spacexai", "엑스ai"), "groki"),
+    # 모회사·소유 관계 승계 금지 (2026-08-19 JJ 정정): «cursor» 는 매핑하지 않는다. Cursor 는 SpaceX 소유지만
+    # 캐릭터는 **소식의 주체** 기준이다 — ep19(주체=SpaceX 인수)는 그로키가 성립했고 ep21(주체=Cursor, Origin 출시)은
+    # 아니다. 실장이 «SpaceX 계열»로 승인한 것이 오류였다. 회사≠모델 조항(위 alibaba)과 같은 계열.
 ]
 
 
@@ -217,8 +220,21 @@ _CONST_REAL_PLACE = ("Set in a real, physical place with a floor, walls and dept
 
 # 브랜드 색 규칙 — 소품 층에 붙는 상수 문장. teal 은 **물리 소품에만**(그로키 씬 배경에 청록 도형이
 # 떴던 사고). 연출 층이 아니라 상수 층에 둔다: 무드가 어떻든 이 문장은 남는다.
-_CONST_TEAL = ("Teal appears only on physical props in the scene, never as floating shapes, "
-               "gradients or graphic panels in the background.")
+#
+# 🔴 2026-08-21 개정 — 종전 문구 «Teal appears only on physical props» 가 **지시로 읽혔다.**
+# 「teal 이 나온다면 소품에만」이 의도인데 모델은 「소품을 teal 로 칠하라」로 받았다.
+# ep25 에서 **두 번** 났다: 빈 쪽지가 teal 로 → 색을 명시해 고쳤더니 이번엔 노트북이 teal 로.
+# **대상만 옮겨 다녔다.**
+#
+# 왜 지금까지 안 났나 — 라이브러리 7종은 전부 색을 명시했다(「민트 컨베이어」·「크림·초록·청회색
+# 태그」). teal 비중 실측 0.8~8.1% 로 전부 정상이다. **색을 안 적은 주인공이 있을 때만** 이
+# 문장이 그 빈자리를 채운다.
+#
+# 그래서 금지만 더하지 않고 **빈자리를 다른 규칙으로 메운다** — 마지막 문장(주인공은 제 재질색을
+# 지킨다)이 핵심이다. 금지만 하면 빈자리가 남고, 빈자리는 또 채워진다.
+_CONST_TEAL = ("Teal is optional and must never dominate. If teal appears at all, only on small "
+               "secondary props in the background. Never colour the main subject teal — main "
+               "subjects keep their natural material colour.")
 
 #: 화면비별 구도 지시(상수 ⑤). 4:5 표지는 헤드라인이 얹히는 하단 1/3 을 비운다.
 #: 종전엔 «brightly lit floor» 로 밝기를 못박았는데, 무드가 변수가 되면서 다크 표지가 가능해졌다 —
@@ -239,10 +255,35 @@ _NO_TEXT = "Absolutely no text, no letters, no numbers, no labels."
 FORMATS = {
     "product":   "실물형 — 제품 로고·공식 화면·발표 자료 캡처 중심. **이 빌더가 만들지 않는다**(캡처·코드 합성 경로, 로고는 §6 실물 합성만). 제품 출시·기업 소식에 우선.",
     "character": "캐릭터 연기형 — 마스코트가 소재를 연기. 연기할 «상황»이 있을 때만. action 필수.",
-    "situation": "상황 일러스트형 — 무캐릭터 소품·장면(ep20 방식). 로스터 밖 주체·회사 소식.",
+    "situation": "상황 일러스트형 — 무캐릭터 소품·장면(ep20 방식). 개념·상황 소재(소품이 이야기하는 소재).",
+    "logo":      "로고 시네마틱형 (2026-08-20 v3.28) — 공식 로고 원본(`assets/logos/`, 출처 URL 병기)을 **참조 이미지로 물려** 씬과 함께 생성. 로고가 빛·파티클·공간과 상호작용. 제품·기업 소식에서 로고가 캐릭터 역할. 생성 후 **로고 형태 원본 대조 가드**(마크 왜곡·글자 뭉개짐 → 재생성, 반복 실패 시 폴백 = 배경 생성 + 로고 코드 합성).",
+    "ui":        "제품 UI 클로즈업형 — 실물 캡처 크롭. **이 빌더가 만들지 않는다.**",
+    "typo":      "타이포형 — 팁·가이드류, 코드 합성. **이 빌더가 만들지 않는다.**",
     "photo":     "실사형 — 행사·인물·실물 제품(출처 표기 §5). **이 빌더가 만들지 않는다.**",
 }
-_GENERATIVE = ("character", "situation")
+# 선택 기준 한 줄 (JJ 2026-08-19): «제품·기업 소식 = 로고/UI가 캐릭터 역할, 개념·상황 소재 = 일러스트».
+_GENERATIVE = ("character", "situation", "logo")
+
+# 로고 원본 보관소 — 사용한 로고는 여기 두고 README.md 에 출처 URL 을 병기한다 (v3.28).
+LOGO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                        "tomangchi-lab.github.io", "workshop", "assets", "logos")
+
+
+def logo_reference(name):
+    """`assets/logos/<name>.png` 경로. 없으면 예외 — 로고 없이 로고형을 돌리면 모델이 글자를 지어낸다."""
+    p = os.path.join(LOGO_DIR, f"{name}.png")
+    if not os.path.exists(p):
+        raise FileNotFoundError(f"로고 원본이 없다: {p} — 공식 소스에서 받아 assets/logos/ 에 두고 README.md 에 출처 URL 을 적어라")
+    # 2026-08-25 (SKILL v3.51): «존재»가 아니라 «디코드»로 판정한다. 2026-08-22 GitHub `Octocat.png` URL 이 404 인데
+    # HTML 본문 128,658 B 가 .png 로 저장돼 정상 PNG(7,249 B)보다 17배 컸다 — 크기·확장자·HTTP 코드로는 안 갈린다.
+    # 여기가 참조를 얻는 유일한 경로라 이 가드 하나로 깨진 참조를 손에 쥘 방법이 없어진다(정관 §0 4층 ①).
+    from PIL import UnidentifiedImageError
+    try:
+        with Image.open(p) as im:
+            im.verify()                 # 헤더까지 실제로 읽는다
+    except (UnidentifiedImageError, OSError) as e:
+        raise ValueError(f"참조 이미지가 아니다: {p} — {e}. 404 HTML 본문이 .png 로 저장된 경우가 실제로 있었다(2026-08-22)")
+    return p
 
 
 class Staging:
@@ -313,6 +354,12 @@ def illust_prompt(subject, motif=None, ratio="1:1", place=None, staging=None, ch
             raise ValueError(f"주체 {subject!r} 에 담당 캐릭터가 없다 — format='situation' 으로 가라(§2 로스터 밖 주체).")
         c = CHARACTERS[ch]
         parts.append(f"<<<{c['element']}>>> {c['look']} — {st.action.rstrip('.')}.")
+    elif st.format == "logo":
+        parts.append(f"The official {subject} logo mark from the attached reference image is the hero object — "
+                     f"reproduce its shape, proportions and colors exactly as in the reference, as one physical or luminous object "
+                     f"in the scene; do not redraw, bend, add or remove any part of the mark, and do not add lettering. "
+                     + (st.action.rstrip('.') + ". " if st.action else "")
+                     + "No characters, no people, no mascots.")
     else:
         if st.action:
             parts.append(st.action.rstrip('.') + ". No characters, no people, no mascots.")
