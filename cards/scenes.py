@@ -80,6 +80,26 @@ CONCEPTS = {
     "shared-computer": ["컴퓨터 공유", "한 대 공유", "공유 컴퓨터", "권한 공유",
                         "shared-computer"],
     "handoff": ["인계", "넘겨줌", "결과물 전달", "handoff"],
+    # ⚠️ **키워드는 부분 문자열로 매칭되고 먼저 선언된 개념이 이긴다.**
+    #    그래서 "마감 겹침" 으로 부르면 위쪽 `deadline`("마감")이 먼저 잡혀 엉뚱한
+    #    파일명이 나온다. 아래 개념은 **"겹침"** 으로 부를 것. 새 개념을 넣을 때는
+    #    쓰려는 호출 문자열이 위 개념의 키워드를 품고 있지 않은지 먼저 확인한다.
+    #
+    # ep15(마누스) — 기간·마감이 얽힌 소식의 상황 4종. 서비스가 달라도 구조가 같으면
+    # 그대로 맞는다: 무료 개방 이벤트, 창이 겹치는 일정, 점검으로 막히는 기간, 이관 마감.
+    "deadline-overlap": ["기간 겹침", "겹침", "두 기간", "창이 겹침",
+                         "deadline-overlap", "overlap"],  # «마감 겹침»은 위 deadline("마감")에 먼저 걸리는 죽은 키워드라 뺐다 (self_test 2026-08-19)
+    # 2026-08-27: «무료 개방»·«free» 를 뺐다 — 이 PR 이 열려 있던 사이(8/26) 등재된
+    # `free-lane-more-items`(ep33) 가 그 둘을 키워드로 쓴다. 이 표는 **먼저 선언된 개념이 이기므로**
+    # 그대로 두면 `무료 개방`·`free`·`free-lane` 호출이 전부 이쪽으로 와 ep33 씬을 가린다
+    # (self_test 실측 3건). 먼저 선언된 쪽이 정본이고, 이 개념은 «무료 풀림»으로 부른다.
+    # 🔴 «개방» 도 뺀다 — 매칭이 **부분 문자열**이라 «개방» 하나만 남겨도 «무료 개방» 호출을 그대로 삼킨다
+    #    (키워드를 지운 1차 수정에서 실측: 충돌 3건 → 1건, «무료 개방» 은 여전히 free-open 으로 갔다).
+    #    남은 부름말: 무료 풀림 · 요금 면제 · 공짜 · free-open.
+    "free-open": ["무료 풀림", "요금 면제", "공짜", "free-open"],
+    "shutter": ["셔터", "못 씀", "닫힘", "점검", "일시 중단",
+                "shutter", "closed"],  # «접근 차단 기간»은 block("차단")에 먼저 걸리는 죽은 키워드라 뺐다 (self_test 2026-08-19)
+    "backup": ["백업", "옮겨 담기", "대피", "보관", "이관", "backup"],
     # ── 지피(OpenAI) 상황 씬 — 속도·등급·측정조건 계열 (2026-08-15 신설) ──────
     # 울트라패스트 편에서 6장을 생성해 놓고 **여기 등재를 빠뜨렸다.** 파일과
     # scenes.json 은 멀쩡한데 `_concept_key` 가 None 을 돌려 `find_scene` 이
@@ -122,7 +142,7 @@ CONCEPTS = {
     "free-lane-more-items": ["무료 개방", "무료로 되는 것", "무료 차로", "무료 확대", "free", "free-lane", "free-lane-more-items"],
     "one-notebook-two-desks": ["기억 공유", "메모리 공유", "같은 수첩", "두 자리 한 기억", "하나의 메모리", "memory", "shared-memory", "one-notebook-two-desks"],
     # ep34 (2026-08-26) — 다음 세대 설계도를 먼저 펼쳐 보인다(Qwen4 구조 미리보기 오픈 웨이트)
-    "blueprint-unroll": ["설계도 공개", "구조 미리보기", "청사진", "차세대 구조", "선행 공개", "blueprint", "architecture-preview", "blueprint-unroll"],
+    "blueprint-unroll": ["설계도 공개", "구조 미리보기", "청사진", "차세대 구조", "선행 공개", "blueprint", "blueprint-unroll"],   # «architecture-preview» 제거 2026-08-27 — 위 narrow-door 의 «preview» 에 먼저 걸리는 죽은 키워드였다(main 단독 self_test 에서도 잡히던 기존 결함)
     "three-labels-laid-out": ["나란히 놓기", "펼쳐 놓기", "층별 정리", "대조표",
                               "견주기", "laid-out", "side-by-side"],
 }
