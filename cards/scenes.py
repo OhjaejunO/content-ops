@@ -145,6 +145,17 @@ CONCEPTS = {
     "blueprint-unroll": ["설계도 공개", "구조 미리보기", "청사진", "차세대 구조", "선행 공개", "blueprint", "blueprint-unroll"],   # «architecture-preview» 제거 2026-08-27 — 위 narrow-door 의 «preview» 에 먼저 걸리는 죽은 키워드였다(main 단독 self_test 에서도 잡히던 기존 결함)
     "three-labels-laid-out": ["나란히 놓기", "펼쳐 놓기", "층별 정리", "대조표",
                               "견주기", "laid-out", "side-by-side"],
+    # ep35 (2026-08-27) — 이름 없이 돌던 것에 이름표와 가격표가 같이 붙는다
+    # («공짜»·«무료 개방» 은 위 free-open·free-lane-more-items 가 이미 가진다 —
+    #  여기는 «무료였다가 값이 붙은» 전환이라 키워드를 겹치지 않게 잡았다)
+    "unmasked-and-priced": ["정체 공개", "익명 해제", "이름표 붙음", "값이 붙음",
+                            "유료 전환", "unmasked", "unmasked-and-priced"],
+    # ep36 (2026-08-27) — 말하면 그 자리에서 정리된 글이 된다(받아쓰기·필러 제거)
+    "speak-and-it-writes": ["받아쓰기", "음성 입력", "말하면 글", "구술",
+                            "필러 제거", "speak-and-it-writes"],
+    # ep37 (2026-08-27) — 잘못을 알아차린 쪽이 리포트 초안을 스스로 쓴다
+    "drafts-own-report": ["리포트 초안", "스스로 신고", "초안 작성",
+                          "잘못 알아차림", "drafts-own-report"],
 }
 
 #: **사용 보류된 «포즈» 개념 (2026-08-15).** 등재 단위를 잘못 잡은 흔적이다.
