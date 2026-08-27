@@ -31,7 +31,37 @@ git_dir=$(git rev-parse --git-dir 2>/dev/null) || exit 0
 
 case "$git_dir" in
     */worktrees/*)
-        exit 0
+        # Linked worktree: commits are allowed. Run the data-invariant checks that
+        # guard what is in this commit, before it lands.
+        #
+        # WHY (2026-08-27): scenes.self_test() existed and passed nobody for ten days.
+        # In that gap two keyword shadows appeared (ep33 free-lane, ep34 blueprint) and
+        # both silently returned the wrong scene. A check with no automatic caller is a
+        # note, not a check. scenes.py now also self-checks at runtime; this is the
+        # second layer, so a bad table cannot even be committed.
+        staged=$(git diff --cached --name-only 2>/dev/null)
+        rc=0
+        case "$staged" in
+            *cards/scenes.py*)
+                if out=$(py cards/scenes.py 2>&1); then
+                    printf '  [repo-guard] scenes self_test OK\n' >&2
+                else
+                    printf '\n  [repo-guard] scenes self_test FAILED - commit refused\n\n%s\n\n' "$out" >&2
+                    rc=1
+                fi
+                ;;
+        esac
+        case "$staged" in
+            *cards/freshness.py*)
+                if out=$(py cards/freshness.py 2>&1); then
+                    printf '  [repo-guard] freshness self_test OK\n' >&2
+                else
+                    printf '\n  [repo-guard] freshness self_test FAILED - commit refused\n\n%s\n\n' "$out" >&2
+                    rc=1
+                fi
+                ;;
+        esac
+        exit $rc
         ;;
 esac
 
