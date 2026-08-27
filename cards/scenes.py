@@ -217,6 +217,8 @@ def _concept_key(concept, table=None):
 
     `table` 은 `self_test()` 가 합성 표를 넣어 보기 위한 자리다 — 평소엔 비운다.
     """
+    if table is None:
+        _ensure_self_test()      # 실물 표를 쓸 때만. 합성 표(self_test)는 검사 대상이 아니다.
     t = CONCEPTS if table is None else table
     c = (concept or "").strip().lower()
     if c in t:
@@ -396,6 +398,35 @@ def self_test():
     live = _shadow_check(CONCEPTS)
     caught = _shadow_check(_SHADOW_FIXTURE)
     return live, bool(caught)
+
+
+_SELF_TEST_DONE = False
+
+
+def _ensure_self_test():
+    """개념 표를 쓰기 **전에** 그림자 검사를 한 번 돌린다. 그림자가 있으면 시작하지 않는다.
+
+    🔴 **왜 자동 호출인가 (2026-08-27).** `self_test()` 는 8/26 부터 열흘 동안 **아무도 부르지 않았다.**
+    그 사이 ep33 `free-lane-more-items` 의 «무료 개방» 이 뒤에 선언된 개념에 가려졌고, ep34
+    `blueprint-unroll` 의 «architecture-preview» 는 `narrow-door` 의 «preview» 에 먹혔다.
+    둘 다 **조용히** 다른 씬을 돌려주는 상태였다 — 검사가 있었는데 부르는 자리가 없었다.
+    부르는 자리가 없는 검사는 검사가 아니라 메모다(정관 §0 «감지 장치가 값을 담는지»).
+
+    `cardcheck._ensure_self_test()` 와 같은 방식이다 — 한 프로세스에서 한 번만 돌고(0.001초대),
+    실패하면 **예외로 멈춘다.** 조용히 넘어가면 이 함수의 존재 이유가 없다.
+    """
+    global _SELF_TEST_DONE
+    if _SELF_TEST_DONE:
+        return
+    live, caught = self_test()
+    if live:
+        raise AssertionError(
+            "씬 개념 키워드 그림자 %d건 — 먼저 선언된 개념이 뒤 개념의 부름말을 삼킨다: %s\n"
+            "고치는 법: 가리는 쪽 키워드를 빼거나(부분 문자열까지 본다) 선언 순서를 옮긴다. "
+            "`py cards/scenes.py` 로 재측정(그 진입점이 자기검사를 찍는다)." % (len(live), live))
+    if not caught:
+        raise AssertionError("그림자 역검증이 헛돈다 — _SHADOW_FIXTURE 가 안 걸린다. 검사기가 고장 났다.")
+    _SELF_TEST_DONE = True
 
 
 def rebuild_index(character):
