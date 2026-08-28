@@ -229,6 +229,46 @@ STYLE_PRESETS = {
                  "space carry the idea; no attempt at physical realism."),
     "physical": ("Tangible physical objects photographed on a plain surface, natural light, honest "
                  "everyday materials — no gloss, no studio staging."),
+
+    # ── 2026-08-28 증설 ─────────────────────────────────────────────────────
+    # 넷(clay·cartoon·illustration·abstract)만 돌고 있어 편마다 그림체가 겹쳤다.
+    # 후보 12종을 **같은 장면·같은 4:5 구도**로 시험 생성해 ① 그림체가 결과에 실제로 나타나는가
+    # ② 게이트 `[1-1]` 텍스트 존(하단 1/3)을 **우리가 쓰는 잉크 글자로** 통과하는가 둘 다 봤다.
+    # 통과한 것만 여기 올린다. 떨어진 것과 사유는 아래 STYLE_REJECTED 에 남긴다 —
+    # 지우면 다음 사람이 같은 후보를 다시 시험한다.
+    "flat-vector": ("Flat vector poster illustration: clean even fills, one crisp dark outline weight, "
+                    "no photographic texture, no gradients on the background, soft paper-grain only."),
+    "isometric": ("Isometric technical illustration at a fixed 30-degree axonometric angle, clean flat "
+                  "fills with one darker shade per face, thin consistent outlines, no perspective "
+                  "convergence."),
+    "pixel-art": ("Pixel art in a coarse 64-pixel grid, hard aliased edges, a strictly limited palette "
+                  "of about twelve colours, flat dithered shading, no anti-aliasing."),
+    "papercut": ("Layered paper cut-out collage: each element is a separate sheet of matte coloured "
+                 "paper with visible torn or scissor-cut edges and a soft drop shadow between layers."),
+    "watercolor": ("Loose watercolour and gouache painting on cold-press paper, visible brush edges and "
+                   "pigment pooling, soft bleeds, white paper showing through."),
+    "retro-print": ("Mid-century retro print: limited flat inks, coarse paper texture, slight halftone "
+                    "dots and off-register edges, muted warm palette."),
+}
+
+#: 시험했으나 **등재하지 않은** 그림체와 사유 (2026-08-28 실측).
+#: 🔴 지우지 않는다 — 없으면 다음 사람이 같은 후보를 같은 값을 치르고 다시 시험한다.
+STYLE_REJECTED = {
+    "blueprint": ("🔴 **바닥이 어둡다.** 흰 선 제도라 하단 1/3 이 진한 파랑(밝기 71)으로 나온다. "
+                  "게이트 `[1-1]` 은 대비 184 로 **통과**시키는데, 그건 «흰 글자» 기준의 통과다 — "
+                  "우리 `template` 은 **잉크(어두운 글자)**를 찍으므로 실물에서는 헤드라인이 안 보인다. "
+                  "게이트 통과와 «쓸 수 있다»가 갈리는 자리 (정관 §0)."),
+    "neon-cyber": ("🔴 **그림체가 안 걸린다.** «어두운 바닥 + 네온»이 우리 고정 구도의 «하단 1/3 은 "
+                   "밝고 저밀도»와 정면으로 충돌하고, 구도 쪽이 이긴다 — 결과는 네온이 아니라 그냥 "
+                   "밝은 사진이 나온다. 스타일 문구를 세게 써도 같다. **구도와 싸우는 그림체는 "
+                   "프리셋이 될 수 없다.**"),
+    "cel-anime": ("🟡 **구분이 안 선다.** 잉크 선·2단 셰이딩이 결과에 뚜렷이 안 나타나고 "
+                  "`illustration`·`clay` 산출물과 눈으로 안 갈린다. 프리셋을 늘리는 목적이 "
+                  "«편마다 다르게»인데 안 갈리면 늘린 값이 없다."),
+    "render-3d": "🟡 같은 사유 — `clay` 와 산출물이 겹친다.",
+    "diorama": ("🟡 같은 사유 — 미니어처·틸트시프트가 안 나타나고 `clay`·`render-3d` 와 겹친다. "
+                "실물 소품 느낌은 `physical` 이 이미 맡는다."),
+    "risograph": "🟡 같은 사유 — 오버프린트 어긋남이 안 나타나고 `retro-print` 와 겹친다.",
 }
 
 # 브랜드 색 규칙 — 소품 층에 붙는 상수 문장. teal 은 **물리 소품에만**(그로키 씬 배경에 청록 도형이
@@ -308,9 +348,16 @@ class Staging:
               format="situation" 이면 «장면에서 벌어지는 일»을 적는다(캐릭터 없이).
     mood      감정 온도 + 조명 + 색온도. 전부 개방 — 다크+국부광(랜턴·모니터광·스포트라이트), 긴장·미스터리·
               코믹·드라마·차분. «따뜻한 낮»은 선택지 중 하나일 뿐 기본값이 아니다.
-    style     🔴 **필수 (2026-08-28)**. 그림체·질감·공간감. `STYLE_PRESETS` 키(clay·cartoon·illustration·
-              abstract·physical) 또는 영문 구절 직접. **빈 값을 허용하지 않는다** — 허용하면 옛 클레이
-              고정으로 조용히 돌아가고, 그것이 이 개정이 없앤 바로 그 상태다.
+    style     🔴 **필수 (2026-08-28)**. 그림체·질감·공간감. `STYLE_PRESETS` 키 또는 영문 구절 직접.
+              **빈 값을 허용하지 않는다** — 허용하면 옛 클레이 고정으로 조용히 돌아가고, 그것이 이
+              개정이 없앤 바로 그 상태다.
+              프리셋 11종 — clay·cartoon·illustration·abstract·physical(기존) +
+              flat-vector·isometric·pixel-art·papercut·watercolor·retro-print(2026-08-28 증설).
+              🔴 **새 그림체를 프리셋에 올리기 전에 두 가지를 시험 생성으로 확인한다**:
+              ① 그림체가 산출물에 **실제로 나타나는가**(기존 프리셋과 눈으로 갈리는가)
+              ② 게이트 `[1-1]` 텍스트 존을 **우리가 쓰는 잉크 글자로** 통과하는가.
+              ②를 «게이트 통과»로만 보면 안 된다 — `cover_text_zone` 은 바닥이 어두우면
+              «흰 글자» 기준으로 재서 통과를 낸다. 떨어뜨린 후보와 사유는 `STYLE_REJECTED` 에 남긴다.
     subject_cue
               표지에서 **무슨 소재인지 읽히게 하는 단서**. 브랜드의 형태·색·상징을 장면 속 캐릭터나
               사물로 **재해석**해 적는다 — 공식 로고 파일을 붙이지 않는다(그건 format="logo" 경로다).
